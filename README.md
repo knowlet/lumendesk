@@ -1,0 +1,95 @@
+# LumenDesk
+
+An independently authored Rust desktop toolkit milestone with GPU-drawn native
+controls, system-webview windows, a typed JSON bridge, and project tooling.
+
+**This is a working first milestone, not a feature-complete replacement.** Native
+and webview hosts compile on Linux, but this development sandbox denies Unix
+display sockets: actual window rendering, OS input, and webview execution have
+not been verified. macOS and Windows adapters are unverified. Simultaneous native
+and webview windows in one process are not implemented yet.
+
+## Start here
+
+Rust 1.95+ and a C compiler are required; this build was checked with Rust 1.99.
+On Debian/Ubuntu, system-webview builds need GTK 3 and WebKitGTK 4.1 development
+packages. A normal host setup is:
+
+```sh
+sudo apt install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+cargo test --workspace
+cargo run -p lumendesk --example native_form --features native
+cargo run -p lumendesk --example web_form --features webview
+```
+
+The native feature uses egui/eframe's OpenGL renderer and does not initialize a
+webview or need Node. The webview feature uses Wry/Tao with the OS web engine.
+Linux runtime needs an actual X11/Wayland desktop and matching installed shared
+libraries. Build flags do not prove runtime support. See [platform notes](docs/PLATFORMS.md).
+
+## Create an app
+
+```sh
+cargo run -p lumendesk-cli -- new hello-native --mode native
+cargo run -p lumendesk-cli -- new hello-web --mode web
+cargo run -p lumendesk-cli -- doctor --project hello-web
+cargo run -p lumendesk-cli -- bindings --project hello-web
+cargo run -p lumendesk-cli -- build --project hello-web
+cargo run -p lumendesk-cli -- dev --project hello-web
+```
+
+Scaffolds reference the SDK's local absolute path. Move/update that path with your
+project; no crates.io publication is claimed. `new` refuses populated directories.
+`build` actually invokes Cargo and reports its executable. `dev` retains the last
+working child on compilation failure, then stops it before starting its successor.
+See [CLI documentation](crates/lumendesk-cli/README.md).
+
+## Library surface
+
+- `lumendesk-core`: display-free contracts; lifecycle, schemas, bridge, assets,
+  typed events, call-bound bounded streams, cancellation and security tests
+- `lumendesk`: validated window options; opt-in `native` and `webview` hosts
+- `lumendesk::native::run_native`: run your own `eframe::App`; egui is re-exported
+- `lumendesk::webview::WebApplication`: embed your assets, register your bridge,
+  open multiple web windows, validate/broadcast events, cancel close requests
+- `lumendesk-cli`: `new`, `doctor`, `bindings`, `build`, `dev`, version and help
+
+The reference forms share the same `FormState` definition, but run as separate
+applications. The JavaScript runtime offers promise calls and on/once/unsubscribe
+listeners. Streaming currently exists as a tested Rust core contract; it is not
+exposed over the JavaScript transport yet.
+
+## Verification
+
+```sh
+cargo test --workspace --all-features
+cargo clippy --workspace --all-features --all-targets -- -D warnings
+cargo fmt --all -- --check
+node --test tests/*.test.mjs
+npm ci --ignore-scripts
+npm run test:types
+```
+
+All-feature checks require Linux GUI development libraries even though unit tests
+do not open windows. Node is optional and used only for JavaScript runtime tests,
+not for native apps. [Acceptance traceability](docs/ACCEPTANCE.md) records the 18
+functional cases, evidence, and gaps. [Security model](docs/SECURITY.md) explains
+what the bridge guarantees and what application authors must keep trusted.
+
+## Deliberate gaps
+
+Mixed native/web event-loop integration, full desktop service APIs, persisted
+monitor-aware geometry, single-instance/deep links, hot reload without forced
+termination, packaging/installers, signing/notarization, updating, full widget
+parity, frontend streaming, and platform-level accessibility/IME verification
+remain future work. Unsupported capabilities are not represented as successful.
+No compatibility or performance parity is claimed.
+
+## Provenance and licensing
+
+Implementation was separated from upstream research and based on a paraphrased
+functional specification. No upstream implementation, tests, generated output,
+assets, or templates were read or copied by the implementation team. This is a
+practical separation procedure, not legal certification. See
+[clean-room record](docs/CLEAN_ROOM.md). Dependencies remain under their own
+licenses. LumenDesk's newly authored code is dual-licensed MIT OR Apache-2.0.
