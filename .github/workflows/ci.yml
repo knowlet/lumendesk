@@ -61,5 +61,13 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Run formatting, tests, lint, examples and TypeScript checks
         run: sh scripts/verify.sh
+      - name: Cache all target dependencies for the offline archive regression
+        run: |
+          cargo fetch --locked
+          fixture=$(mktemp -d)
+          trap 'rm -rf "$fixture"' EXIT
+          cargo run -p lumendesk-cli --locked -- new "$fixture/web-cache" --mode web
+          cargo generate-lockfile --offline --manifest-path "$fixture/web-cache/Cargo.toml"
+          cargo fetch --locked --manifest-path "$fixture/web-cache/Cargo.toml"
       - name: Verify relocated web source archive and bundled SDK tests
         run: cargo test -p lumendesk-cli --test package --locked real_web_source_archive_builds_and_retains_sdk_test_fixtures -- --ignored --exact

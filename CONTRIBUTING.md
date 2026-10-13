@@ -54,7 +54,9 @@ cargo test -p lumendesk-cli --test package --locked \
 ```
 
 The second test requires Linux GTK/WebKit development libraries and dependencies
-cached by the main build. It rebuilds a relocated source archive and runs its SDK
+cached before its offline checks. On a fresh machine, run `cargo fetch --locked`
+for the workspace and fetch the generated web scaffold's locked dependencies too;
+a Linux-only build does not download every cross-platform metadata dependency. It rebuilds a relocated source archive and runs its SDK
 tests. No display is used. CI uses a read-only token, no repository secrets, a
 full-SHA-pinned checkout and no credential persistence. It does not publish,
 deploy, sign, create releases or merge PRs. Hosted CI has not been verified until
