@@ -2,8 +2,11 @@
 
 ## Branches and pull requests
 
-The initial `main` publication is the validated first milestone at
-`8913199473040cf10780359d0cc0f33889c6df9b`. Subsequent changes use a focused
+The initial `main` publication is the validated first milestone from local
+source snapshot `8913199473040cf10780359d0cc0f33889c6df9b`. Its GitHub
+commit is `288e79fda31580bdcb969f1951f21c2372ee5ef6`; both have tree
+`b51ac79aeb9c4eb245ee1be4f580bdde8277cb5b`. The supported import API
+assigns new commit metadata; original authored history remains in the Git bundle. Subsequent changes use a focused
 branch and a **draft pull request** targeting `main`; do not push follow-up
 changes directly to `main`. Open the PR early, explain scope and verification,
 and mark it ready only after the current revision is tested and ready for review.
