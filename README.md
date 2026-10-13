@@ -20,6 +20,7 @@ sudo apt install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
 cargo test --workspace
 cargo run -p lumendesk --example native_form --features native
 cargo run -p lumendesk --example web_form --features webview
+cargo run -p lumendesk --example web_stream --features webview
 ```
 
 The native feature uses egui/eframe's OpenGL renderer and does not initialize a
@@ -52,12 +53,22 @@ See [CLI documentation](crates/lumendesk-cli/README.md).
 - `lumendesk::native::run_native`: run your own `eframe::App`; egui is re-exported
 - `lumendesk::webview::WebApplication`: embed your assets, register your bridge,
   open multiple web windows, validate/broadcast events, cancel close requests
-- `lumendesk-cli`: `new`, `doctor`, `bindings`, `build`, `dev`, version and help
+- `lumendesk-cli`: `new`, `doctor`, `bindings`, `build`, `dev`, `package`, version and help
 
 The reference forms share the same `FormState` definition, but run as separate
-applications. The JavaScript runtime offers promise calls and on/once/unsubscribe
-listeners. Streaming currently exists as a tested Rust core contract; it is not
-exposed over the JavaScript transport yet.
+applications. The JavaScript runtime offers promise calls, on/once/unsubscribe listeners, and
+pull-driven typed async-iterator streams. Stream queues are bounded and cancellable;
+terminal results follow the final consumed item. See [streaming](docs/STREAMING.md).
+The Rust/JavaScript wire fixture is shared by both test suites; actual OS-webview
+stream execution remains unverified.
+
+## Portable archives
+
+The CLI can create source or host-binary archives with checksums and dependency
+notices. Source archives bundle the local SDK with relative dependency paths.
+Registry crates are not vendored. Binary archives require the target desktop
+runtime libraries; these are not signed installers. See the CLI guide for
+`package --kind source|binary` and safety limits.
 
 ## Verification
 
@@ -80,8 +91,8 @@ what the bridge guarantees and what application authors must keep trusted.
 
 Mixed native/web event-loop integration, full desktop service APIs, persisted
 monitor-aware geometry, single-instance/deep links, hot reload without forced
-termination, packaging/installers, signing/notarization, updating, full widget
-parity, frontend streaming, and platform-level accessibility/IME verification
+termination, installers, signing/notarization, updating, full widget
+parity, and platform-level accessibility/IME verification
 remain future work. Unsupported capabilities are not represented as successful.
 No compatibility or performance parity is claimed.
 

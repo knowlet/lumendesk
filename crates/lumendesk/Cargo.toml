@@ -27,3 +27,7 @@ required-features = ["webview"]
 [[example]]
 name = "web_multiwindow"
 required-features = ["webview"]
+
+[[example]]
+name = "web_stream"
+required-features = ["webview"]

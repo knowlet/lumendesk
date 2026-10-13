@@ -57,10 +57,22 @@ Host event schemas are validated before enqueue; per-window queues hold at most
 queues return errors. Events queue before readiness; navigation discards the old
 page's queued events and listeners. Event callbacks should remain short.
 
-Rust streams are bounded, preserve FIFO order, cancel when the consumer drops,
-and terminate when their originating call returns. They are not wired to the
-JavaScript host transport in this milestone. The core stream contract is not a
-claim of browser-stream support.
+Frontend streams are explicitly registered separately from ordinary calls. Each
+stream has a bounded Rust queue, and the host sends one item per frontend read
+credit. Completion follows all queued items. Iterator return, abort, page closure
+and navigation cancel the producer. The host caps 64 total streams, 16 per window,
+128 queued/running ordinary calls and 16 windows. Cancelled noncooperative handlers
+retain their worker permit until they actually exit. This prevents cancellation
+from becoming a way to spawn unlimited threads. Incoming command queues are also
+bounded; raw IPC flooding is dropped and times out. Cancellation signals reach
+the core immediately, bypassing a saturated incoming queue.
+
+The runtime defaults to a 30-second idle/read timeout. The host enforces a
+60-second idle/read ceiling and sends an explicit terminal error on expiry, even
+if a larger frontend timeout was requested. Awaiting a stream's `.result` without
+draining the iterator deliberately backpressures and eventually times out.
+Actual Wry stream execution is not verified; mock JavaScript and Rust host tests
+share exact wire fixtures. Legacy call-bound Rust streams remain available too.
 
 Embedded assets are served from an in-memory allowlist, never from the filesystem.
 Traversal (including repeated percent encoding), NULs and backslashes are rejected.

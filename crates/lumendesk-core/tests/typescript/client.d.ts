@@ -6,11 +6,19 @@ export interface Methods {
   "no-args": { args: null; result: string };
   "open-map": { args: { "known"?: (string | null); [key: string]: JsonValue | undefined; }; result: boolean };
 }
+export interface StreamMethods {
+  "count": { args: number; item: number; result: string };
+  "nullable-item": { args: null; item: (string | null); result: boolean };
+}
 export interface Events {
   "changed": { "name": string; "revision": number; };
   "cleared": null;
 }
+export interface CallStream<T, R> extends AsyncIterableIterator<T> {
+  readonly result: Promise<R>;
+}
 export interface Client {
   call<K extends keyof Methods>(method: K, args: Methods[K]['args'], signal?: AbortSignal): Promise<Methods[K]['result']>;
+  stream<K extends keyof StreamMethods>(method: K, args: StreamMethods[K]['args'], signal?: AbortSignal): CallStream<StreamMethods[K]['item'], StreamMethods[K]['result']>;
   on<K extends keyof Events>(event: K, listener: (payload: Events[K]) => void, options?: { once?: boolean }): () => void;
 }

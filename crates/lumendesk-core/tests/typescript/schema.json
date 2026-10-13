@@ -27,5 +27,9 @@
   "events": {
     "changed": { "kind": "object", "additional": false, "fields": { "name": { "schema": { "kind": "string" }, "optional": false }, "revision": { "schema": { "kind": "integer" }, "optional": false } } },
     "cleared": { "kind": "null" }
+  },
+  "streams": {
+    "count": { "name": "count", "arguments": { "kind": "integer" }, "item": { "kind": "integer" }, "result": { "kind": "string" } },
+    "nullable-item": { "name": "nullable-item", "arguments": { "kind": "null" }, "item": { "kind": "nullable", "inner": { "kind": "string" } }, "result": { "kind": "boolean" } }
   }
 }

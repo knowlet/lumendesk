@@ -1,4 +1,3 @@
-npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
 
 > test:types
 > node tests/verify-types.mjs && sh crates/lumendesk-core/tests/typescript/check.sh
@@ -10,4 +9,6 @@ crates/lumendesk-core/tests/typescript/invalid.ts(5,24): error TS2740: Type '{ l
 crates/lumendesk-core/tests/typescript/invalid.ts(6,22): error TS2345: Argument of type '(payload: string) => void' is not assignable to parameter of type '(payload: { name: string; revision: number; }) => void'.
   Types of parameters 'payload' and 'payload' are incompatible.
     Type '{ name: string; revision: number; }' is not assignable to type 'string'.
+crates/lumendesk-core/tests/typescript/invalid.ts(7,15): error TS2345: Argument of type '"missing-stream"' is not assignable to parameter of type 'keyof StreamMethods'.
+crates/lumendesk-core/tests/typescript/invalid.ts(8,24): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
 Positive TypeScript fixture passed; invalid fixture failed as expected.

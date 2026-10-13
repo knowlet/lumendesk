@@ -1,0 +1,4 @@
+   Compiling lumendesk-core v0.1.0 (/tmp/lumendesk-extracted-web-fL4sQm/_sdk/crates/lumendesk-core)
+   Compiling lumendesk v0.1.0 (/tmp/lumendesk-extracted-web-fL4sQm/_sdk/crates/lumendesk)
+   Compiling web-portable v0.1.0 (/tmp/lumendesk-extracted-web-fL4sQm)
+    Finished `release` profile [optimized] target(s) in 3.01s
