@@ -1,0 +1,12 @@
+Command: cargo test -p lumendesk-cli --test package --offline -- --ignored
+Environment: Rust/Cargo on PATH; local gui-env.sh sourced; existing Cargo cache.
+
+   Compiling lumendesk-cli v0.1.0 (/workspace/scratch/c7703109bdb3/rust-desktop-cleanroom/crates/lumendesk-cli)
+    Finished `test` profile [unoptimized] target(s) in 0.41s
+     Running tests/package.rs (target/debug/deps/package-df76a091c76bd037)
+
+running 1 test
+test real_web_source_archive_builds_and_retains_sdk_test_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 10.27s
+

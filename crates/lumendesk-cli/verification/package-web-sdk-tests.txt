@@ -1,0 +1,27 @@
+   Compiling lumendesk-core v0.1.0 (/tmp/lumendesk-extracted-web-5twFtt/_sdk/crates/lumendesk-core)
+   Compiling lumendesk v0.1.0 (/tmp/lumendesk-extracted-web-5twFtt/_sdk/crates/lumendesk)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.77s
+     Running unittests src/lib.rs (target/debug/deps/lumendesk-89f5ec75adf3e4fb)
+
+running 12 tests
+test tests::rejects_bad_geometry ... ok
+test tests::shared_form_unicode_and_disabled ... ok
+test tests::desktop_services_fail_explicitly ... ok
+test web_streams::tests::registration_errors_do_not_require_a_pull_and_stale_receivers_are_dropped ... ok
+test web_streams::tests::duplicate_credit_and_allocation_limits_are_explicit ... ok
+test web_streams::tests::work_budget_remains_bounded_until_worker_releases ... ok
+test webview::tests::bundled_assets_embed_all_resources_and_reject_traversal ... ok
+test webview::tests::broadcast_overflow_never_partially_delivers ... ok
+test webview::tests::events_are_bounded_typed_and_targeted ... ok
+test webview::tests::exact_origin_matching_is_not_prefix_matching ... ok
+test web_streams::tests::idle_expiry_cancels_blocked_producer_and_reclaims_slot ... ok
+test web_streams::tests::slow_consumer_has_no_unsolicited_values_and_completion_follows_last_item ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests lumendesk
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
