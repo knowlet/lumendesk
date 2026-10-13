@@ -59,7 +59,8 @@ session. Backend worker queues need their own bound.
 
 `CallContext::stream<T>(capacity)` creates a bounded ordered stream tied to the
 call. It permits at most 16 streams per call. A full queue returns `QueueFull`;
-the producer deliberately retries after the consumer drains. Bounds count items,
+`send_wait` instead suspends its worker until space is available, retaining the
+item and observing cancellation. Never wait on the UI thread. Bounds count items,
 so transport adapters must also limit serialized item size. Completion has a
 separate slot and follows all queued values. The host must drain streams before
 delivering call completion. Returning from the handler seals unfinished streams
@@ -70,6 +71,60 @@ including streams whose handler already returned.
 `bounded_stream` is also usable independently. An unfinished standalone producer
 reports an explicit error on drop. Dropping a fully drained receiver does not
 cancel a successfully completed operation.
+
+### Frontend-facing streams
+
+Register a separate `StreamMethodSchema` with arguments, individual item, and
+terminal result schemas. Ordinary and stream methods cannot share names.
+
+```rust
+use lumendesk_core::{Bridge, BridgeConfig, Schema, StreamMethodSchema, StreamSink};
+let bridge = Bridge::new(BridgeConfig::production("lumendesk://app")?)?;
+bridge.register_stream(
+    StreamMethodSchema::new("count", Schema::Integer, Schema::Integer, Schema::String),
+    |context, count: u32, stream: StreamSink<u32>| {
+        for value in 0..count {
+            context.check_cancelled()?;
+            stream.send_wait(value)?;
+        }
+        Ok("finished")
+    },
+)?;
+# Ok::<(), lumendesk_core::CoreError>(())
+```
+
+The host calls `Bridge::begin_stream(&authorization, request, capacity)` in
+request-ID admission order, receiving a `StreamCall` job and a
+`BridgeStreamReceiver`. Both are `Send`. Run `job.run()` on a bounded backend
+worker pool; it does not create threads itself. The receiver retains original
+window/session/request identity through `authorization()` and `request_id()`.
+`begin_stream_json` also checks raw payload size before parsing.
+
+Only poll `receiver.try_next()` when the frontend supplies demand. It returns
+`Ok(None)` while no frame is ready, then `StreamResponseItem::Value` frames in
+sequence, and finally one `Complete(Result<serde_json::Value>)`. Completion is
+unavailable until all buffered values have been consumed, including on handler
+error/panic. Never drain eagerly into an unbounded transport queue. The host must
+recheck `Bridge::authorize(receiver.authorization())` before delivering each
+frame and discard stale deliveries. Cancellation returns `Err(Cancelled)` and
+discards remaining items; dropping or cancelling the receiver interrupts a
+blocked producer. Dropping an unrun job supplies an explicit terminal error.
+
+`StreamSink::send` returns `QueueFull` immediately and consumes its input on
+failure. `send_wait` retains the item while waiting and wakes on consumer progress;
+external cancellation is checked at least every 25 ms. Both validate serialized
+item schemas and sizes. The existing bridge payload limit applies separately to
+requests, each item, and the terminal result. The queue bounds items, with at most
+one waiting item per producer call. Host workers and frontend demand also need
+independent bounds. Streams retain their pending-session budget until completion
+is consumed or the receiver is cancelled/dropped, including after handler return.
+
+`SchemaRegistry` accepts an optional `streams` map; older method/event registries
+still parse. Generated `Client.stream` returns a typed `CallStream<Item, Result>`
+that is an `AsyncIterableIterator<Item>` with a separate `result: Promise<Result>`.
+The transport settles that promise only after the final stream frame. Consumers
+must pull through completion; awaiting `result` without consuming can deliberately
+backpressure the producer. Iterator return, abort, and navigation cancel the call.
 
 ## Events and lifecycle
 
@@ -94,7 +149,7 @@ repeatedly decodes paths with a finite limit, rejects traversal/backslashes/NUL
 and malformed escapes, and only falls back to the entry page for extensionless
 missing paths. Missing `.js`, `.css`, images, and dotfiles remain errors.
 
-`SchemaRegistry::typescript()` deterministically emits typed method/event
+`SchemaRegistry::typescript()` deterministically emits typed method/event/stream
 interfaces. It does not generate or silently install a transport implementation.
 Schemas are explicit and checked on arguments and results in addition to serde.
 `Integer` is limited to ±(2^53−1); encode larger Rust integers as strings.

@@ -191,6 +191,26 @@ impl MethodSchema {
     }
 }
 
+/// A frontend stream has individually typed items and a separate terminal result.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StreamMethodSchema {
+    pub name: String,
+    pub arguments: Schema,
+    pub item: Schema,
+    pub result: Schema,
+}
+
+impl StreamMethodSchema {
+    pub fn new(name: impl Into<String>, arguments: Schema, item: Schema, result: Schema) -> Self {
+        Self {
+            name: name.into(),
+            arguments,
+            item,
+            result,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SchemaRegistry {
@@ -198,16 +218,29 @@ pub struct SchemaRegistry {
     methods: BTreeMap<String, MethodSchema>,
     #[serde(default)]
     events: BTreeMap<String, Schema>,
+    #[serde(default)]
+    streams: BTreeMap<String, StreamMethodSchema>,
 }
 
 impl SchemaRegistry {
     pub fn register_method(&mut self, method: MethodSchema) -> Result<()> {
         validate_name(&method.name)?;
-        if self.methods.contains_key(&method.name) {
+        if self.methods.contains_key(&method.name) || self.streams.contains_key(&method.name) {
             return Err(CoreError::DuplicateRegistration(method.name));
         }
         self.methods.insert(method.name.clone(), method);
         Ok(())
+    }
+    pub fn register_stream(&mut self, method: StreamMethodSchema) -> Result<()> {
+        validate_name(&method.name)?;
+        if self.methods.contains_key(&method.name) || self.streams.contains_key(&method.name) {
+            return Err(CoreError::DuplicateRegistration(method.name));
+        }
+        self.streams.insert(method.name.clone(), method);
+        Ok(())
+    }
+    pub fn streams(&self) -> &BTreeMap<String, StreamMethodSchema> {
+        &self.streams
     }
     pub fn register_event(&mut self, name: impl Into<String>, payload: Schema) -> Result<()> {
         let name = name.into();
@@ -236,11 +269,21 @@ impl SchemaRegistry {
                 method.result.typescript()
             ));
         }
+        text.push_str("}\nexport interface StreamMethods {\n");
+        for (name, method) in &self.streams {
+            text.push_str(&format!(
+                "  {}: {{ args: {}; item: {}; result: {} }};\n",
+                quote(name),
+                method.arguments.typescript(),
+                method.item.typescript(),
+                method.result.typescript()
+            ));
+        }
         text.push_str("}\nexport interface Events {\n");
         for (name, payload) in &self.events {
             text.push_str(&format!("  {}: {};\n", quote(name), payload.typescript()));
         }
-        text.push_str("}\nexport interface Client {\n  call<K extends keyof Methods>(method: K, args: Methods[K]['args'], signal?: AbortSignal): Promise<Methods[K]['result']>;\n  on<K extends keyof Events>(event: K, listener: (payload: Events[K]) => void, options?: { once?: boolean }): () => void;\n}\n");
+        text.push_str("}\nexport interface CallStream<T, R> extends AsyncIterableIterator<T> {\n  readonly result: Promise<R>;\n}\nexport interface Client {\n  call<K extends keyof Methods>(method: K, args: Methods[K]['args'], signal?: AbortSignal): Promise<Methods[K]['result']>;\n  stream<K extends keyof StreamMethods>(method: K, args: StreamMethods[K]['args'], signal?: AbortSignal): CallStream<StreamMethods[K]['item'], StreamMethods[K]['result']>;\n  on<K extends keyof Events>(event: K, listener: (payload: Events[K]) => void, options?: { once?: boolean }): () => void;\n}\n");
         text
     }
 }

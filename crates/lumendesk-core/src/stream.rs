@@ -1,10 +1,14 @@
-//! Bounded, ordered, nonblocking streams. Full queues reject the producer rather
+//! Bounded, ordered streams. Full queues reject or suspend the producer rather
 //! than allocating more memory. The consumer drains values before completion.
 //! Dropping the receiver cancels its token, including a shared call token.
-use crate::{CancellationToken, CoreError, Result};
+use crate::{CancellationToken, CoreError, Result, Schema};
+use serde::Serialize;
+use serde_json::Value;
+use std::marker::PhantomData;
+use std::time::Duration;
 use std::{
     collections::VecDeque,
-    sync::{Arc, Mutex},
+    sync::{Arc, Condvar, Mutex},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -22,12 +26,17 @@ struct State<T> {
     call_managed: bool,
 }
 
+struct Shared<T> {
+    inner: Mutex<State<T>>,
+    changed: Condvar,
+}
+
 pub struct StreamSender<T> {
-    state: Arc<Mutex<State<T>>>,
+    state: Arc<Shared<T>>,
     cancellation: CancellationToken,
 }
 pub struct StreamReceiver<T> {
-    state: Arc<Mutex<State<T>>>,
+    state: Arc<Shared<T>>,
     cancellation: CancellationToken,
 }
 
@@ -40,14 +49,17 @@ pub fn bounded_stream<T>(
             "stream capacity must be positive".into(),
         ));
     }
-    let state = Arc::new(Mutex::new(State {
-        queue: VecDeque::new(),
-        capacity,
-        next_sequence: 0,
-        completion: None,
-        completion_read: false,
-        call_managed: false,
-    }));
+    let state = Arc::new(Shared {
+        inner: Mutex::new(State {
+            queue: VecDeque::new(),
+            capacity,
+            next_sequence: 0,
+            completion: None,
+            completion_read: false,
+            call_managed: false,
+        }),
+        changed: Condvar::new(),
+    });
     Ok((
         StreamSender {
             state: state.clone(),
@@ -63,7 +75,8 @@ pub fn bounded_stream<T>(
 impl<T> StreamSender<T> {
     pub fn send(&self, value: T) -> Result<u64> {
         self.cancellation.check()?;
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.inner.lock().unwrap();
+        self.cancellation.check()?;
         if state.completion.is_some() {
             return Err(CoreError::StreamFinished);
         }
@@ -75,40 +88,69 @@ impl<T> StreamSender<T> {
         state.queue.push_back((sequence, value));
         Ok(sequence)
     }
+    /// Blocks only the producer thread while full. Values are retained until admitted;
+    /// receiver consumption wakes the producer, and cancellation is checked at least
+    /// every 25 ms even when it originates from an external session token.
+    pub fn send_wait(&self, value: T) -> Result<u64> {
+        let mut state = self.state.inner.lock().unwrap();
+        loop {
+            self.cancellation.check()?;
+            if state.completion.is_some() {
+                return Err(CoreError::StreamFinished);
+            }
+            if state.queue.len() < state.capacity {
+                let sequence = state.next_sequence;
+                state.next_sequence = sequence.checked_add(1).ok_or(CoreError::StreamFinished)?;
+                state.queue.push_back((sequence, value));
+                return Ok(sequence);
+            }
+            state = self
+                .state
+                .changed
+                .wait_timeout(state, Duration::from_millis(25))
+                .unwrap()
+                .0;
+        }
+    }
     /// Completion has a separate slot and never needs queue capacity.
     pub fn finish(&self, result: Result<()>) -> Result<()> {
         self.cancellation.check()?;
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.inner.lock().unwrap();
+        self.cancellation.check()?;
         if state.completion.is_some() {
             return Err(CoreError::StreamFinished);
         }
         state.completion = Some(result);
+        self.state.changed.notify_all();
         Ok(())
     }
     pub fn cancellation(&self) -> &CancellationToken {
         &self.cancellation
     }
     pub fn queued_len(&self) -> usize {
-        self.state.lock().unwrap().queue.len()
+        self.state.inner.lock().unwrap().queue.len()
     }
 }
 
 impl<T: Send + 'static> StreamSender<T> {
     pub(crate) fn completion_hook(&self) -> Box<dyn FnOnce(Result<()>) + Send> {
         let state = self.state.clone();
-        state.lock().unwrap().call_managed = true;
+        state.inner.lock().unwrap().call_managed = true;
+        let shared = state;
         Box::new(move |result| {
-            let mut state = state.lock().unwrap();
+            let mut state = shared.inner.lock().unwrap();
             if state.completion.is_none() {
                 state.completion = Some(result);
             }
+            drop(state);
+            shared.changed.notify_all();
         })
     }
 }
 
 impl<T> Drop for StreamSender<T> {
     fn drop(&mut self) {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.inner.lock().unwrap();
         if state.completion.is_none() && !state.call_managed {
             state.completion = Some(Err(CoreError::Backend(
                 "stream producer ended without completion".into(),
@@ -121,12 +163,13 @@ impl<T> StreamReceiver<T> {
     /// `None` means no item is currently available or completion was consumed.
     /// Cancellation discards all outstanding values and remains an error.
     pub fn try_next(&self) -> Result<Option<StreamItem<T>>> {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.inner.lock().unwrap();
         if self.cancellation.is_cancelled() {
             state.queue.clear();
             return Err(CoreError::Cancelled);
         }
         if let Some((sequence, value)) = state.queue.pop_front() {
+            self.state.changed.notify_one();
             return Ok(Some(StreamItem::Value { sequence, value }));
         }
         if state.completion_read {
@@ -138,12 +181,16 @@ impl<T> StreamReceiver<T> {
         }
         Ok(None)
     }
+    pub fn queued_len(&self) -> usize {
+        self.state.inner.lock().unwrap().queue.len()
+    }
     pub fn cancel(&self) {
         self.cancellation.cancel();
-        self.state.lock().unwrap().queue.clear();
+        self.state.inner.lock().unwrap().queue.clear();
+        self.state.changed.notify_all();
     }
     pub fn is_complete(&self) -> bool {
-        self.state.lock().unwrap().completion_read
+        self.state.inner.lock().unwrap().completion_read
     }
 }
 
@@ -152,6 +199,60 @@ impl<T> Drop for StreamReceiver<T> {
         if !self.is_complete() {
             self.cancel();
         }
+    }
+}
+
+/// Typed frontend producer. Each item is serialized, schema-checked and size-limited
+/// before admission to the bounded call stream. `QueueFull` is deliberate backpressure;
+/// retry only after allowing the host consumer to drain. Completion belongs to the
+/// handler return value, so this producer cannot finish a frontend stream early.
+pub struct StreamSink<T> {
+    sender: StreamSender<Value>,
+    schema: Schema,
+    max_payload_bytes: usize,
+    marker: PhantomData<fn(T)>,
+}
+
+impl<T: Serialize> StreamSink<T> {
+    pub(crate) fn new(
+        sender: StreamSender<Value>,
+        schema: Schema,
+        max_payload_bytes: usize,
+    ) -> Self {
+        Self {
+            sender,
+            schema,
+            max_payload_bytes,
+            marker: PhantomData,
+        }
+    }
+    pub fn send(&self, item: T) -> Result<u64> {
+        self.sender.send(self.encode(item)?)
+    }
+    /// Wait for capacity without dropping the item. Run on a backend worker,
+    /// never the UI thread; cancellation interrupts the wait.
+    pub fn send_wait(&self, item: T) -> Result<u64> {
+        self.sender.send_wait(self.encode(item)?)
+    }
+    fn encode(&self, item: T) -> Result<Value> {
+        self.sender.cancellation().check()?;
+        let value = serde_json::to_value(item)
+            .map_err(|error| CoreError::InvalidResult(error.to_string()))?;
+        self.schema
+            .validate(&value)
+            .map_err(CoreError::InvalidResult)?;
+        let bytes = serde_json::to_vec(&value)
+            .map_err(|error| CoreError::InvalidResult(error.to_string()))?;
+        if bytes.len() > self.max_payload_bytes {
+            return Err(CoreError::PayloadTooLarge);
+        }
+        Ok(value)
+    }
+    pub fn cancellation(&self) -> &CancellationToken {
+        self.sender.cancellation()
+    }
+    pub fn queued_len(&self) -> usize {
+        self.sender.queued_len()
     }
 }
 
