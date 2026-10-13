@@ -1,0 +1,18 @@
+[package]
+name = "lumendesk-cli"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT OR Apache-2.0"
+description = "Independent project tooling for LumenDesk desktop applications"
+
+[[bin]]
+name = "lumendesk"
+path = "src/main.rs"
+
+[dependencies]
+lumendesk-core = { path = "../lumendesk-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.9"
+ctrlc = "3.5"

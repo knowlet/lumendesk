@@ -1,0 +1,5 @@
+   Compiling lumendesk-core v0.1.0 (/workspace/scratch/c7703109bdb3/rust-desktop-cleanroom/crates/lumendesk-core)
+   Compiling lumendesk v0.1.0 (/workspace/scratch/c7703109bdb3/rust-desktop-cleanroom/crates/lumendesk)
+   Compiling lumendesk-cli-native-smoke v0.1.0 (/workspace/scratch/c7703109bdb3/rust-desktop-cleanroom/target/cli-scaffold-smoke/lumendesk-cli-native-smoke)
+    Finished `release` profile [optimized] target(s) in 2.05s
+Release executable: /workspace/scratch/c7703109bdb3/rust-desktop-cleanroom/target/release/lumendesk-cli-native-smoke

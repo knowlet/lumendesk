@@ -1,0 +1,13 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> test:types
+> node tests/verify-types.mjs && sh crates/lumendesk-core/tests/typescript/check.sh
+
+TypeScript: positive fixture passed; all four expected invalid uses rejected.
+crates/lumendesk-core/tests/typescript/invalid.ts(3,13): error TS2345: Argument of type '"missing-method"' is not assignable to parameter of type 'keyof Methods'.
+crates/lumendesk-core/tests/typescript/invalid.ts(4,24): error TS2345: Argument of type 'undefined' is not assignable to parameter of type 'null'.
+crates/lumendesk-core/tests/typescript/invalid.ts(5,24): error TS2740: Type '{ label: string; }' is missing the following properties from type '{ active: boolean; anything: JsonValue; count: number; empty: null; label: string; nested: { child: string; }; nullable: string | null; optional?: number; optionalNullable?: boolean | null; ratio: number; tags: string[]; }': "active", "anything", "count", "empty", and 4 more.
+crates/lumendesk-core/tests/typescript/invalid.ts(6,22): error TS2345: Argument of type '(payload: string) => void' is not assignable to parameter of type '(payload: { name: string; revision: number; }) => void'.
+  Types of parameters 'payload' and 'payload' are incompatible.
+    Type '{ name: string; revision: number; }' is not assignable to type 'string'.
+Positive TypeScript fixture passed; invalid fixture failed as expected.

@@ -1,0 +1,4 @@
+rust-desktop-cleanroom/tests/typescript/negative.ts(3,13): error TS2345: Argument of type '"unknown"' is not assignable to parameter of type '"greet"'.
+rust-desktop-cleanroom/tests/typescript/negative.ts(4,23): error TS2322: Type 'number' is not assignable to type 'string'.
+rust-desktop-cleanroom/tests/typescript/negative.ts(5,22): error TS2741: Property '"enthusiastic"' is missing in type '{ name: string; }' but required in type '{ enthusiastic: boolean; name: string; }'.
+rust-desktop-cleanroom/tests/typescript/negative.ts(6,11): error TS2345: Argument of type '"missing-event"' is not assignable to parameter of type '"greeting"'.

@@ -1,0 +1,132 @@
+   Compiling lumendesk v0.1.0 (/workspace/scratch/c7703109bdb3/rust-desktop-cleanroom/crates/lumendesk)
+    Finished `test` profile [unoptimized] target(s) in 1.24s
+     Running unittests src/lib.rs (target/debug/deps/lumendesk-9eff95941687fac7)
+
+running 9 tests
+test tests::desktop_services_fail_explicitly ... ok
+test tests::rejects_bad_geometry ... ok
+test tests::shared_form_unicode_and_disabled ... ok
+test webview::tests::broadcast_overflow_never_partially_delivers ... ok
+test webview::tests::bundled_assets_embed_all_resources_and_reject_traversal ... ok
+test webview::tests::exact_origin_matching_is_not_prefix_matching ... ok
+test webview::tests::events_are_bounded_typed_and_targeted ... ok
+test native::tests::native_view_click_and_disabled_semantics ... ok
+test native::tests::native_keyboard_focus_and_activation ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running unittests src/lib.rs (target/debug/deps/lumendesk_cli-7cfc88e8e9d89b51)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/lumendesk-af8167de30c953fe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli.rs (target/debug/deps/cli-d413e0e63290a4f1)
+
+running 16 tests
+test destination_symlink_is_rejected ... ok
+test config_rejects_unknown_fields_unsupported_versions_and_escaping_paths ... ok
+test configured_bindings_reject_symlink_files_and_directories_without_touching_external_data ... ok
+test bindings_default_project_path_replaces_existing_generated_file ... ok
+test bindings_are_deterministic_and_validate_registry ... ok
+test invalid_names_modes_and_sdk_fail_before_creating_files ... ok
+test doctor_reports_missing_tools_without_claiming_success ... ok
+test explicit_bindings_output_rejects_symlinks_and_replaces_hardlinks_safely ... ok
+test populated_destination_is_preserved_exactly ... ok
+test doctor_rejects_old_rust_compiler ... ok
+test scaffolds_both_modes_in_fresh_and_empty_directories ... ok
+test missing_cargo_and_malformed_schema_are_actionable_failures ... ok
+test help_version_unknown_commands_and_missing_config ... ok
+test release_build_produces_real_executable ... ok
+test dev_once_sets_separate_identity_and_propagates_app_failure ... ok
+test dev_preserves_working_process_on_failure_then_releases_resources_before_swap ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.78s
+
+     Running unittests src/lib.rs (target/debug/deps/lumendesk_core-0a24bc4c0d7c0fff)
+
+running 48 tests
+test assets::tests::canonicalizes_slashes_dot_segments_and_unicode ... ok
+test assets::tests::entry_css_and_binary_bytes_preserve_mime ... ok
+test assets::tests::bounded_decode_fails_closed ... ok
+test assets::tests::rejects_backslashes_controls_invalid_utf8_and_uri_confusion ... ok
+test assets::tests::missing_entry_and_empty_asset_keys_are_explicit_errors ... ok
+test assets::tests::fallback_only_for_extensionless_missing_final_component ... ok
+test assets::tests::failed_inserts_are_atomic_and_normalized_keys_replace ... ok
+test assets::tests::rejects_plain_encoded_mixed_and_multiencoded_traversal ... ok
+test bridge::tests::backend_errors_and_result_schema_mismatch_are_explicit ... ok
+test bridge::tests::call_completion_closes_retained_streams_and_contexts ... ok
+test bridge::tests::normalizes_standard_default_ports_but_never_trusts_localhost ... ok
+test bridge::tests::cancelling_before_dispatch_prevents_execution_and_has_a_bound ... ok
+test bridge::tests::rejects_external_lookalike_frames_and_credentials ... ok
+test bridge::tests::sessions_do_not_cross_windows_or_bridges ... ok
+test bridge::tests::leaving_a_call_stream_early_cancels_the_call ... ok
+test bridge::tests::navigation_cancels_buffered_streams_after_the_handler_finished ... ok
+test bridge::tests::typed_unicode_roundtrip_and_failure_contracts ... ok
+test events::tests::callback_panics_do_not_discard_remaining_queued_events ... ok
+test events::tests::callback_panic_does_not_starve_later_subscribers_or_replay_once ... ok
+test bridge::tests::enforces_payload_result_limits_and_contains_panics ... ok
+test events::tests::event_schema_is_checked ... ok
+test events::tests::foreign_bus_listener_id_cannot_unsubscribe_local_listener ... ok
+test events::tests::overflow_is_bounded_and_broadcast_atomic ... ok
+test bridge::tests::navigation_invalidates_authority_and_cancels_pending_work ... ok
+test events::tests::targeted_broadcast_ready_once_unsubscribe ... ok
+test events::tests::navigation_removes_listeners_and_queued_data_and_close_fails ... ok
+test lifecycle::tests::a_foreign_listener_token_cannot_remove_a_local_listener ... ok
+test lifecycle::tests::destruction_bypasses_cancellation_but_reports_shutdown_states ... ok
+test lifecycle::tests::close_request_panic_preserves_state_and_runs_remaining_listeners ... ok
+test events::tests::callback_panic_does_not_starve_ready_or_unready_broadcast_destinations ... ok
+test lifecycle::tests::every_listener_kind_can_be_removed_before_it_runs_again ... ok
+test lifecycle::tests::first_close_can_be_cancelled_and_second_allowed ... ok
+test lifecycle::tests::complete_order_and_exactly_once_readiness ... ok
+test lifecycle::tests::close_cancellation_is_sticky_and_all_listeners_run_in_order ... ok
+test lifecycle::tests::independent_lifecycles_do_not_share_state ... ok
+test lifecycle::tests::invalid_transitions_leave_history_and_readiness_unchanged ... ok
+test lifecycle::tests::late_ready_runs_before_registration_returns_even_after_closure ... ok
+test lifecycle::tests::readiness_notifications_finish_before_resuming_a_callback_panic ... ok
+test lifecycle::tests::ready_callbacks_follow_state_callbacks_in_registration_order ... ok
+test lifecycle::tests::shutdown_finishes_before_resuming_a_state_callback_panic ... ok
+test schema::tests::optional_is_not_nullable_and_unknown_fields_fail ... ok
+test schema::tests::output_is_deterministic_and_quotes_arbitrary_names ... ok
+test schema::tests::rejects_unsafe_and_fractional_integers ... ok
+test stream::tests::bounded_and_ordered_before_completion ... ok
+test stream::tests::consumer_leaving_cancels_producer ... ok
+test stream::tests::navigation_cancellation_discards_buffered_values ... ok
+test stream::tests::rejected_sends_do_not_skip_sequence_numbers ... ok
+test stream::tests::unfinished_producer_reports_error_after_values ... ok
+
+test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/typescript.rs (target/debug/deps/typescript-2ee4303cf0603b7d)
+
+running 1 test
+test generated_typescript_matches_checked_fixture ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lumendesk
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lumendesk_cli
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lumendesk_core
+
+running 1 test
+test crates/lumendesk-core/src/lib.rs - (line 12) ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.19s; merged doctests compilation took 0.19s

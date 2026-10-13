@@ -1,0 +1,31 @@
+{
+  "methods": {
+    "inspect": {
+      "name": "inspect",
+      "arguments": {
+        "kind": "object",
+        "additional": false,
+        "fields": {
+          "label": { "schema": { "kind": "string" }, "optional": false },
+          "active": { "schema": { "kind": "boolean" }, "optional": false },
+          "count": { "schema": { "kind": "integer" }, "optional": false },
+          "ratio": { "schema": { "kind": "number" }, "optional": false },
+          "empty": { "schema": { "kind": "null" }, "optional": false },
+          "anything": { "schema": { "kind": "json" }, "optional": false },
+          "tags": { "schema": { "kind": "array", "items": { "kind": "string" } }, "optional": false },
+          "nullable": { "schema": { "kind": "nullable", "inner": { "kind": "string" } }, "optional": false },
+          "optional": { "schema": { "kind": "integer" }, "optional": true },
+          "optionalNullable": { "schema": { "kind": "nullable", "inner": { "kind": "boolean" } }, "optional": true },
+          "nested": { "schema": { "kind": "object", "additional": false, "fields": { "child": { "schema": { "kind": "string" }, "optional": false } } }, "optional": false }
+        }
+      },
+      "result": { "kind": "array", "items": { "kind": "object", "additional": false, "fields": { "id": { "schema": { "kind": "integer" }, "optional": false }, "payload": { "schema": { "kind": "json" }, "optional": false } } } }
+    },
+    "no-args": { "name": "no-args", "arguments": { "kind": "null" }, "result": { "kind": "string" } },
+    "open-map": { "name": "open-map", "arguments": { "kind": "object", "additional": true, "fields": { "known": { "schema": { "kind": "nullable", "inner": { "kind": "string" } }, "optional": true } } }, "result": { "kind": "boolean" } }
+  },
+  "events": {
+    "changed": { "kind": "object", "additional": false, "fields": { "name": { "schema": { "kind": "string" }, "optional": false }, "revision": { "schema": { "kind": "integer" }, "optional": false } } },
+    "cleared": { "kind": "null" }
+  }
+}

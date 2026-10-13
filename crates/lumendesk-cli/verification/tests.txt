@@ -1,0 +1,42 @@
+   Compiling lumendesk-core v0.1.0 (/workspace/scratch/c7703109bdb3/rust-desktop-cleanroom/crates/lumendesk-core)
+   Compiling lumendesk-cli v0.1.0 (/workspace/scratch/c7703109bdb3/rust-desktop-cleanroom/crates/lumendesk-cli)
+    Finished `test` profile [unoptimized] target(s) in 1.14s
+     Running unittests src/lib.rs (target/debug/deps/lumendesk_cli-d2a7c5153da7536f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/lumendesk-b7ffdfe9cad04ae3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli.rs (target/debug/deps/cli-067b146c68f75094)
+
+running 16 tests
+test destination_symlink_is_rejected ... ok
+test config_rejects_unknown_fields_unsupported_versions_and_escaping_paths ... ok
+test configured_bindings_reject_symlink_files_and_directories_without_touching_external_data ... ok
+test doctor_reports_missing_tools_without_claiming_success ... ok
+test invalid_names_modes_and_sdk_fail_before_creating_files ... ok
+test explicit_bindings_output_rejects_symlinks_and_replaces_hardlinks_safely ... ok
+test bindings_default_project_path_replaces_existing_generated_file ... ok
+test populated_destination_is_preserved_exactly ... ok
+test bindings_are_deterministic_and_validate_registry ... ok
+test scaffolds_both_modes_in_fresh_and_empty_directories ... ok
+test missing_cargo_and_malformed_schema_are_actionable_failures ... ok
+test help_version_unknown_commands_and_missing_config ... ok
+test doctor_rejects_old_rust_compiler ... ok
+test release_build_produces_real_executable ... ok
+test dev_once_sets_separate_identity_and_propagates_app_failure ... ok
+test dev_preserves_working_process_on_failure_then_releases_resources_before_swap ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.79s
+
+   Doc-tests lumendesk_cli
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

@@ -1,0 +1,7 @@
+LumenDesk doctor: linux / x86_64 (native)
+OK cargo
+OK rustc 1.99.0 (b940084d7 2026-09-28)
+OK x11
+OK xkbcommon
+NOTE No DISPLAY or WAYLAND_DISPLAY; compilation may work, but opening a real window needs a graphical session.
+Required command checks passed. This does not verify a graphical session, GPU, accessibility, or runtime behavior.
