@@ -49,3 +49,17 @@ socket creation with EPERM, including escalated execution. Xvfb cannot start its
 normal local display. We did not switch to a TCP display, disable sandboxing, or
 use a user's device. This also leaves WebKit child-process startup unverified.
 Headless egui input and JavaScript VM tests do not replace OS input tests.
+
+## Hosted cross-platform compile checks
+
+The PR CI matrix includes standard `macos-15` (Apple Silicon) and
+`windows-2022` (x86_64/MSVC) GitHub-hosted runners. Each runs the display-free core
+and SDK library tests, builds the CLI, and compiles/links all native and webview
+examples with Rust 1.99.0. It never launches an application window, requests
+signing credentials, or publishes an artifact. A configured job is not a verified
+result: consult the current commit's Actions run before claiming a platform pass.
+The platform status table above records the earlier locally verified baseline;
+new hosted results will be recorded separately once observed.
+
+PR-title validation is a separate small workflow. Bot edits to a PR description
+therefore do not cancel and restart expensive platform builds.
