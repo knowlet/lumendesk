@@ -1138,3 +1138,51 @@ test('navigation during call serialization prevents an otherwise-valid late call
   assert.equal(r.timers.size, 0);
   assert.deepEqual(r.outbound, []);
 });
+
+test('shared Rust-host wire fixture delivers items and final result with one credit per frame', async () => {
+  const frames = JSON.parse(await readFile(new URL('./fixtures/stream-frames.json', import.meta.url), 'utf8'));
+  const r = makeRuntime();
+  const stream = r.window.lumen.stream('numbers', { count: 3 });
+  const received = [];
+  let resultSettled = false;
+  stream.result.then(() => { resultSettled = true; });
+  for (const [index, frame] of frames.entries()) {
+    assert.equal(resultSettled, false, 'final result stays pending until the host terminal frame');
+    const next = stream.next();
+    assert.equal(pullFrames(r).length, index + 1);
+    assert.deepEqual(pullFrames(r).at(-1), { session: SESSION, pull: frame.id });
+    r.streamFrame(frame);
+    const response = await next;
+    if ('item' in frame) {
+      assert.deepEqual(normalized(response), { done: false, value: frame.item });
+      received.push(response.value);
+    } else {
+      assert.deepEqual(normalized(response), { done: true, value: frame.result.Ok });
+      assert.equal(await stream.result, frame.result.Ok);
+    }
+  }
+  assert.deepEqual(received, [0, 1, 2]);
+  assert.equal(await stream.result, 3);
+  assert.equal(resultSettled, true);
+  assert.equal((await stream.next()).done, true);
+  assert.equal(pullFrames(r).length, frames.length);
+  assert.equal(cancelFrames(r).length, 0);
+  assert.equal(r.timers.size, 0);
+});
+
+test('host lifetime ceiling rejects a pending read even with a longer frontend timeout', async () => {
+  const r = makeRuntime();
+  const { controller, signal, listeners } = trackedAbortController();
+  const stream = r.window.lumen.stream('slow', null, { signal, timeoutMs: 300000 });
+  const predicate = error => error.code === 'backend' && /60s/.test(error.message);
+  const next = assert.rejects(stream.next(), predicate);
+  const result = assert.rejects(stream.result, predicate);
+  assert.equal([...r.timers.values()][0].delay, 300000);
+  r.streamFrame({ id: 1, done: true, result: { Err: { code: 'backend', message: 'Stream exceeded the host 60s lifetime cap' } } });
+  await next; await result;
+  assert.equal((await stream.next()).done, true);
+  assert.equal(r.timers.size, 0);
+  assert.equal(listeners.size, 0);
+  controller.abort();
+  assert.equal(cancelFrames(r).length, 0, 'host terminal errors need no duplicate cancellation');
+});
