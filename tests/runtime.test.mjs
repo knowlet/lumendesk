@@ -1140,7 +1140,7 @@ test('navigation during call serialization prevents an otherwise-valid late call
 });
 
 test('shared Rust-host wire fixture delivers items and final result with one credit per frame', async () => {
-  const frames = JSON.parse(await readFile(new URL('./fixtures/stream-frames.json', import.meta.url), 'utf8'));
+  const frames = JSON.parse(await readFile(new URL('../crates/lumendesk/tests/stream-frames.json', import.meta.url), 'utf8'));
   const r = makeRuntime();
   const stream = r.window.lumen.stream('numbers', { count: 3 });
   const received = [];

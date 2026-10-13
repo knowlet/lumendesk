@@ -1,9 +1,10 @@
 //! System-webview host with embedded assets and an origin-bound, session-scoped bridge.
 use crate::core::assets::AssetStore;
 use crate::core::{
-    Authorization, Bridge, BridgeConfig, CallRequest, CallResponse, CoreError, Field, MethodSchema,
-    Schema, SessionToken, TrustedOrigin, WindowId,
+    Authorization, Bridge, BridgeConfig, BridgeStreamReceiver, CallRequest, CallResponse,
+    CoreError, Field, MethodSchema, Schema, SessionToken, TrustedOrigin, WindowId,
 };
+use crate::web_streams::{MAX_STREAMS, StreamBook, WorkBudget, WorkPermit};
 use crate::{DesktopError, FormState, WindowOptions};
 use serde::Deserialize;
 use serde_json::Value;
@@ -123,6 +124,11 @@ impl WebApplication {
         assets: AssetStore,
     ) -> Result<WindowId, DesktopError> {
         options.validate()?;
+        if self.windows.len() >= 16 {
+            return Err(DesktopError::Backend(
+                "at most 16 web windows are supported".into(),
+            ));
+        }
         let id = WindowId(self.windows.len() as u64 + 1);
         self.sender
             .state
@@ -166,17 +172,19 @@ impl WebApplication {
         run_application(self)
     }
 }
-#[derive(Debug)]
 enum UiMessage {
     Started(WindowId),
     Ready(WindowId, String),
     Response(WindowId, SessionToken, CallResponse),
+    StreamStarted(Authorization, u64, Result<BridgeStreamReceiver, CoreError>),
 }
 struct OpenWindow {
     window: tao::window::Window,
     view: WebView,
     session: Option<SessionToken>,
     close_attempts: usize,
+    commands: mpsc::Receiver<(Authorization, Command)>,
+    jobs: mpsc::SyncSender<Job>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -184,6 +192,30 @@ struct WireMessage {
     session: SessionToken,
     request: Option<CallRequest>,
     cancel: Option<u64>,
+    stream: Option<CallRequest>,
+    pull: Option<u64>,
+}
+enum Command {
+    Call(CallRequest),
+    Stream(CallRequest),
+    Pull(u64),
+    Cancel(u64),
+}
+enum Job {
+    Call(Authorization, CallRequest, WorkPermit),
+    Stream(Authorization, CallRequest, WorkPermit),
+}
+impl WireMessage {
+    fn command(self) -> Option<(SessionToken, Command)> {
+        let command = match (self.request, self.stream, self.pull, self.cancel) {
+            (Some(request), None, None, None) => Command::Call(request),
+            (None, Some(request), None, None) => Command::Stream(request),
+            (None, None, Some(id), None) => Command::Pull(id),
+            (None, None, None, Some(id)) => Command::Cancel(id),
+            _ => return None,
+        };
+        Some((self.session, command))
+    }
 }
 fn backend(error: impl std::fmt::Display) -> DesktopError {
     DesktopError::Backend(error.to_string())
@@ -197,6 +229,9 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
     }
     let mut event_loop = EventLoopBuilder::<UiMessage>::with_user_event().build();
     let mut open = BTreeMap::new();
+    let call_budget = WorkBudget::default();
+    let stream_budget = WorkBudget::default();
+    let mut streams = StreamBook::default();
     let expected = TrustedOrigin::parse(APP_ORIGIN).map_err(backend)?;
     for definition in app.windows {
         let id = definition.id;
@@ -215,17 +250,48 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
         let navigation_bridge = app.bridge.clone();
         let navigation_proxy = event_loop.create_proxy();
         let trusted = expected.clone();
-        let (jobs_tx, jobs_rx) = mpsc::sync_channel::<(Authorization, CallRequest)>(QUEUE_SIZE);
+        let (jobs_tx, jobs_rx) = mpsc::sync_channel::<Job>(QUEUE_SIZE);
+        let (commands_tx, commands_rx) = mpsc::sync_channel(64);
         let worker_bridge = app.bridge.clone();
         let worker_proxy = event_loop.create_proxy();
         std::thread::spawn(move || {
-            while let Ok((auth, request)) = jobs_rx.recv() {
-                let response = worker_bridge.dispatch(&auth, request);
-                let _ = worker_proxy.send_event(UiMessage::Response(id, auth.session, response));
+            while let Ok(job) = jobs_rx.recv() {
+                match job {
+                    Job::Call(auth, request, _permit) => {
+                        let response = worker_bridge.dispatch(&auth, request);
+                        let _ = worker_proxy.send_event(UiMessage::Response(
+                            id,
+                            auth.session,
+                            response,
+                        ));
+                    }
+                    Job::Stream(auth, request, permit) => {
+                        let request_id = request.id;
+                        match worker_bridge.begin_stream(&auth, request, 16) {
+                            Ok((call, receiver)) => {
+                                let _ = worker_proxy.send_event(UiMessage::StreamStarted(
+                                    auth,
+                                    request_id,
+                                    Ok(receiver),
+                                ));
+                                std::thread::spawn(move || {
+                                    let _permit = permit;
+                                    call.run();
+                                });
+                            }
+                            Err(error) => {
+                                let _ = worker_proxy.send_event(UiMessage::StreamStarted(
+                                    auth,
+                                    request_id,
+                                    Err(error),
+                                ));
+                            }
+                        }
+                    }
+                }
             }
         });
         let ipc_bridge = app.bridge.clone();
-        let ipc_proxy = event_loop.create_proxy();
         let page_proxy = event_loop.create_proxy();
         let builder = WebViewBuilder::new()
             .with_url(APP_URL)
@@ -280,34 +346,29 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
                 let Ok(message) = serde_json::from_str::<WireMessage>(request.body()) else {
                     return;
                 };
-                // The token is generated by Rust, injected only into the top-level closure,
-                // and never returned to page code. CSP denies all frames. Wry's Linux IPC
-                // URI alone cannot prove frame identity, so it is never our sole authority.
+                let Some((session, command)) = message.command() else {
+                    return;
+                };
+                // Only a private top-level session is authorized; IPC URL alone cannot
+                // attest iframe identity on Linux. CSP denies all embedded frames.
                 let auth = Authorization {
                     window: id,
-                    session: message.session,
+                    session,
                     page_url: request.uri().to_string(),
                     top_level: true,
                 };
-                match (message.request, message.cancel) {
-                    (Some(call), None) => {
-                        let request_id = call.id;
-                        let token = auth.session.clone();
-                        if jobs_tx.try_send((auth, call)).is_err() {
-                            let _ = ipc_proxy.send_event(UiMessage::Response(
-                                id,
-                                token,
-                                CallResponse {
-                                    id: request_id,
-                                    result: Err(CoreError::QueueFull),
-                                },
-                            ));
-                        }
-                    }
-                    (None, Some(request_id)) => {
-                        let _ = ipc_bridge.cancel(&auth, request_id);
-                    }
-                    _ => {}
+                if ipc_bridge.authorize(&auth).is_err() {
+                    return;
+                }
+                if let Command::Cancel(request_id) = &command {
+                    // Cancellation must not wait behind a saturated command queue.
+                    // The UI book also cleans up below or on its next cancellation poll.
+                    let _ = ipc_bridge.cancel(&auth, *request_id);
+                }
+                if commands_tx.try_send((auth, command)).is_err() {
+                    // The trusted runtime has a smaller pending limit. Raw IPC flooding
+                    // is dropped instead of allocating unbounded event-loop messages.
+                    eprintln!("lumendesk: incoming IPC queue full; request will time out");
                 }
             });
         #[cfg(target_os = "linux")]
@@ -325,6 +386,8 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
                 view,
                 session: None,
                 close_attempts: 0,
+                commands: commands_rx,
+                jobs: jobs_tx,
             },
         );
     }
@@ -349,12 +412,14 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
                     } else {
                         let _ = app.bridge.close_window(id);
                         app.sender.state.lock().unwrap().queues.remove(&id);
+                        streams.clear(id);
                         open.remove(&id);
                     }
                 }
             }
             Event::UserEvent(UiMessage::Started(id)) => {
                 let _ = app.bridge.navigate(id);
+                streams.clear(id);
                 if let Some(window) = open.get_mut(&id) {
                     window.session = None;
                 }
@@ -378,6 +443,7 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
                     }
                 }
             }
+            Event::UserEvent(UiMessage::StreamStarted(auth,id,result)) => { streams.attach(&auth,id,result); }
             Event::UserEvent(UiMessage::Response(id, token, response)) => {
                 if let Some(window) = open.get(&id)
                     && window.session.as_ref() == Some(&token)
@@ -387,6 +453,10 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
                 }
             }
             Event::MainEventsCleared => {
+                route_commands(&mut open,&app.bridge,&mut streams,&call_budget,&stream_budget);
+                for (id,token,frame) in streams.poll(&app.bridge,Instant::now()) {
+                    if let Some(window)=open.get(&id) && window.session.as_ref()==Some(&token) {send_stream_frame(&window.view,&frame);}
+                }
                 for (id, window) in &open {
                     if window.session.is_some() {
                         let events = app.sender.state.lock().unwrap().queues.get_mut(id)
@@ -399,6 +469,7 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
                 if smoke.is_some_and(|duration| started.elapsed() >= duration) {
                     for id in open.keys() {
                         let _ = app.bridge.close_window(*id);
+                        streams.clear(*id);
                     }
                     open.clear();
                     app.sender.state.lock().unwrap().queues.clear();
@@ -413,6 +484,87 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
     });
     Ok(())
 }
+fn send_stream_frame(view: &WebView, frame: &Value) {
+    let _ = view.evaluate_script(&format!(
+        "window.__lumenStream && window.__lumenStream({frame});"
+    ));
+}
+fn stream_error(view: &WebView, id: u64, error: CoreError) {
+    send_stream_frame(
+        view,
+        &serde_json::json!({"id":id,"done":true,"result":Result::<Value,CoreError>::Err(error)}),
+    );
+}
+fn route_commands(
+    open: &mut BTreeMap<WindowId, OpenWindow>,
+    bridge: &Bridge,
+    streams: &mut StreamBook,
+    call_budget: &WorkBudget,
+    stream_budget: &WorkBudget,
+) {
+    for window in open.values_mut() {
+        // Limit work per event-loop pass, even when a trusted page misbehaves.
+        for _ in 0..64 {
+            let Ok((auth, command)) = window.commands.try_recv() else {
+                break;
+            };
+            if window.session.as_ref() != Some(&auth.session) || bridge.authorize(&auth).is_err() {
+                continue;
+            }
+            match command {
+                Command::Call(request) => {
+                    let id = request.id;
+                    let result = call_budget.acquire(128).and_then(|permit| {
+                        window
+                            .jobs
+                            .try_send(Job::Call(auth, request, permit))
+                            .map_err(|_| CoreError::QueueFull)
+                    });
+                    if let Err(error) = result {
+                        let response = CallResponse {
+                            id,
+                            result: Err(error),
+                        };
+                        let _ = window.view.evaluate_script(&format!(
+                            "window.__lumenResponse({});",
+                            serde_json::to_string(&response).unwrap()
+                        ));
+                    }
+                }
+                Command::Stream(request) => {
+                    let id = request.id;
+                    match streams.reserve(auth.clone(), id) {
+                        Err(error) => stream_error(&window.view, id, error),
+                        Ok(()) => {
+                            let result = stream_budget.acquire(MAX_STREAMS).and_then(|permit| {
+                                window
+                                    .jobs
+                                    .try_send(Job::Stream(auth.clone(), request, permit))
+                                    .map_err(|_| CoreError::QueueFull)
+                            });
+                            if let Err(error) = result {
+                                streams.remove(auth.window, id);
+                                stream_error(&window.view, id, error);
+                            }
+                        }
+                    }
+                }
+                Command::Pull(id) => {
+                    if let Err(error) = streams.credit(&auth, id) {
+                        let _ = bridge.cancel(&auth, id);
+                        streams.remove(auth.window, id);
+                        stream_error(&window.view, id, error);
+                    }
+                }
+                Command::Cancel(id) => {
+                    let _ = bridge.cancel(&auth, id);
+                    streams.remove(auth.window, id);
+                }
+            }
+        }
+    }
+}
+
 fn origin_only(url: &str) -> String {
     // Parse via the same URL implementation as the core; do not use prefix trust.
     url::Url::parse(url)

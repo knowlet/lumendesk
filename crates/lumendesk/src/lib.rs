@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "native")]
 pub mod native;
 #[cfg(feature = "webview")]
+mod web_streams;
+#[cfg(feature = "webview")]
 pub mod webview;
 
 /// Shared, device-independent window settings.
