@@ -594,6 +594,24 @@ fn rewrite_manifest(
     if table.contains_key("patch") || table.contains_key("replace") {
         return Err("portable packaging does not support Cargo patch/replace overrides".into());
     }
+    // Only the application root keeps a workspace in the portable archive.
+    // Preserve its lint policy, and reject inheritance we cannot safely retain.
+    let workspace_lints = table
+        .get("workspace")
+        .and_then(|workspace| workspace.get("lints"))
+        .cloned();
+    if table
+        .get("lints")
+        .and_then(|lints| lints.get("workspace"))
+        .and_then(toml::Value::as_bool)
+        == Some(true)
+        && (!prefix.is_empty() || workspace_lints.is_none())
+    {
+        return Err(
+            "workspace-inherited lints outside the application root must be explicit before packaging"
+                .into(),
+        );
+    }
     table.remove("workspace");
     if prefix.is_empty() {
         let members = local
@@ -602,6 +620,9 @@ fn rewrite_manifest(
             .map(|value| toml::Value::String(value.trim_end_matches('/').into()))
             .collect();
         let mut workspace = toml::map::Map::new();
+        if let Some(lints) = workspace_lints {
+            workspace.insert("lints".into(), lints);
+        }
         workspace.insert("exclude".into(), toml::Value::Array(members));
         workspace.insert("resolver".into(), toml::Value::String("3".into()));
         table.insert("workspace".into(), toml::Value::Table(workspace));

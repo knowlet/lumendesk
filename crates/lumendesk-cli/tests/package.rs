@@ -207,6 +207,95 @@ fn source_rebuilds_after_original_app_and_sdk_are_removed() {
     );
 }
 #[test]
+fn source_preserves_root_workspace_lints_after_relocation() {
+    let temp = Temp::new();
+    let app = fixture(&temp);
+    let mut manifest = fs::read_to_string(app.join("Cargo.toml")).unwrap();
+    manifest.push_str("[workspace.lints.rust]\nunsafe_code=\"forbid\"\n[lints]\nworkspace=true\n");
+    fs::write(app.join("Cargo.toml"), manifest).unwrap();
+    let original = Command::new("cargo")
+        .args(["check", "--offline"])
+        .current_dir(&app)
+        .output()
+        .unwrap();
+    assert!(original.status.success(), "{}", text(&original));
+    let archive = temp.join("lints.tar.gz");
+    let result = package(&app, &archive, "source");
+    assert!(result.status.success(), "{}", text(&result));
+    verify_manifest(&entries(&archive));
+    fs::remove_dir_all(&app).unwrap();
+    let extracted = temp.join("relocated");
+    fs::create_dir(&extracted).unwrap();
+    tar::Archive::new(GzDecoder::new(fs::File::open(&archive).unwrap()))
+        .unpack(&extracted)
+        .unwrap();
+    let metadata = Command::new("cargo")
+        .args(["metadata", "--format-version", "1", "--offline", "--locked"])
+        .current_dir(&extracted)
+        .output()
+        .unwrap();
+    assert!(metadata.status.success(), "{}", text(&metadata));
+    let build = Command::new("cargo")
+        .args(["build", "--offline", "--locked"])
+        .current_dir(&extracted)
+        .output()
+        .unwrap();
+    assert!(build.status.success(), "{}", text(&build));
+    fs::write(extracted.join("src/main.rs"), "fn main() { unsafe {} }\n").unwrap();
+    let forbidden = Command::new("cargo")
+        .args(["check", "--offline", "--locked"])
+        .current_dir(&extracted)
+        .output()
+        .unwrap();
+    assert!(!forbidden.status.success(), "unsafe_code forbid was lost");
+    assert!(
+        text(&forbidden).contains("usage of an `unsafe` block"),
+        "{}",
+        text(&forbidden)
+    );
+}
+#[test]
+fn source_rejects_sdk_workspace_lint_inheritance_before_writing_archive() {
+    let temp = Temp::new();
+    let app = fixture(&temp);
+    let sdk = temp.join("sdk");
+    fs::create_dir_all(sdk.join("crates/lumendesk/src")).unwrap();
+    fs::write(
+        sdk.join("Cargo.toml"),
+        "[workspace]\nmembers=[\"crates/lumendesk\"]\nresolver=\"3\"\n[workspace.lints.rust]\nunsafe_code=\"forbid\"\n",
+    ).unwrap();
+    fs::write(
+        sdk.join("crates/lumendesk/Cargo.toml"),
+        "[package]\nname=\"lumendesk\"\nversion=\"0.1.0\"\nedition=\"2024\"\n[lints]\nworkspace=true\n",
+    ).unwrap();
+    fs::write(
+        sdk.join("crates/lumendesk/src/lib.rs"),
+        "pub fn safe() {}\n",
+    )
+    .unwrap();
+    let mut manifest = fs::read_to_string(app.join("Cargo.toml")).unwrap();
+    manifest.push_str(&format!(
+        "[dependencies]\nlumendesk={{path={:?}}}\n",
+        sdk.join("crates/lumendesk").to_str().unwrap()
+    ));
+    fs::write(app.join("Cargo.toml"), manifest).unwrap();
+    let original = Command::new("cargo")
+        .args(["check", "--offline"])
+        .current_dir(&app)
+        .output()
+        .unwrap();
+    assert!(original.status.success(), "{}", text(&original));
+    let archive = temp.join("unsupported-lints.tar.gz");
+    let result = package(&app, &archive, "source");
+    assert!(!result.status.success());
+    assert!(
+        text(&result).contains("workspace-inherited lints outside the application root"),
+        "{}",
+        text(&result)
+    );
+    assert!(!archive.exists());
+}
+#[test]
 fn binary_archive_contains_a_real_host_executable_and_runtime_notes() {
     let temp = Temp::new();
     let app = fixture(&temp);
