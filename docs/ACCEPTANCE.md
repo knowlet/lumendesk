@@ -1,8 +1,15 @@
 # Acceptance traceability
 
-Status date: 2026-10-13. The independently prepared functional specification has
+Status date: 2026-10-19. The independently prepared functional specification has
 18 proposed black-box cases. This document keeps their original scope: a passing
 unit test is not silently promoted to a passing OS acceptance test.
+
+PR #1 baseline `a90f4c2` passed Linux, macOS and Windows CI on 2026-10-19
+([run 39188660594](https://github.com/knowlet/lumendesk/actions/runs/39188660594)).
+Those jobs built and linked desktop code and ran display-free tests; they did
+not run the GUI, Wry IPC, engine iframe/navigation boundaries or desktop
+integration cases. The independent PR review adds targeted regressions and
+retains all of those engine/manual gaps. Check the latest commit's CI separately.
 
 Legend: **PASS** means the stated scoped acceptance was exercised; **PARTIAL**
 means implemented/tested contracts or build evidence exist but the full case is
@@ -37,7 +44,9 @@ not established; **NOT IMPLEMENTED** and **NOT RUN** are explicit gaps.
 - CLI integration tests execute processes and compile real fixture applications.
 - Generated native and web projects are separately built in development/release
   profiles using the actual SDK and embedded assets.
-- Node tests use a VM mock of the DOM/IPC boundary. They are not browser or Wry tests.
+- Node tests use a VM mock of the DOM/IPC boundary, including delayed scripts
+  against a replacement session and exact JSON data preservation. They are not
+  browser or Wry tests.
 - TypeScript compiler fixtures check generated declarations with strict settings.
 - GTK/WebKit C smoke binaries compile/link, but display creation fails with EPERM.
 
@@ -50,6 +59,7 @@ claim completion of the full public toolkit scope or clean-room legal clearance.
 
 ## Evidence
 
-See `evidence/` for test summaries, compiler diagnostics and build/environment
-records. The GUI socket restriction was respected; no alternative network display
-or personal computer was used. No remote repository was created or pushed.
+See `evidence/` for the original local test summaries, compiler diagnostics and
+build/environment records, and the dated platform/redistribution review for
+subsequent evidence. The original GUI socket restriction was respected; those
+historical logs do not describe a completed engine test or the current PR state.

@@ -3,11 +3,12 @@
 An independently authored Rust desktop toolkit milestone with GPU-drawn native
 controls, system-webview windows, a typed JSON bridge, and project tooling.
 
-**This is a working first milestone, not a feature-complete replacement.** Native
-and webview hosts compile on Linux, but this development sandbox denies Unix
-display sockets: actual window rendering, OS input, and webview execution have
-not been verified. macOS and Windows adapters are unverified. Simultaneous native
-and webview windows in one process are not implemented yet.
+**This is a working first milestone with incomplete desktop acceptance.** CI at
+PR #1 commit `a90f4c2` passed Linux, macOS and Windows builds, linking and
+display-free contracts. Actual window rendering, OS input, Wry IPC and WebView
+security boundaries have not been verified. Simultaneous native and webview
+windows in one process are not implemented yet. See the dated evidence in
+[platform notes](docs/PLATFORMS.md) and the current commit's Actions results.
 
 ## Start here
 
@@ -69,6 +70,9 @@ notices. Source archives bundle the local SDK with relative dependency paths.
 Registry crates are not vendored. Binary archives require the target desktop
 runtime libraries; these are not signed installers. See the CLI guide for
 `package --kind source|binary` and safety limits.
+The [redistribution review](docs/REDISTRIBUTION.md) distinguishes dependency
+notice inventory, target-specific material and outstanding release obligations.
+Creating an archive does not grant approval to redistribute it.
 
 ## Verification
 
@@ -86,6 +90,10 @@ do not open windows. Node is optional and used only for JavaScript runtime tests
 not for native apps. [Acceptance traceability](docs/ACCEPTANCE.md) records the 18
 functional cases, evidence, and gaps. [Security model](docs/SECURITY.md) explains
 what the bridge guarantees and what application authors must keep trusted.
+
+The [2026-10-19 independent PR review](docs/PR1-INDEPENDENT-REVIEW.md) records
+reproduced defects, regression fixes, package inspections and the remaining
+maintainer approval and real WebView/GUI acceptance conditions.
 
 ## Deliberate gaps
 

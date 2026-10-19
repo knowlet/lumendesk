@@ -63,8 +63,9 @@ deploy, sign, create releases or merge PRs. Hosted CI has not been verified unti
 a successful remote run is recorded. A private repository's Actions usage may
 consume its owner's included allowance; no paid quota is provisioned here.
 
-Real native/webview windows, accessibility, OS integration, macOS and Windows
-remain separate manual/platform acceptance work. Keep
+Real native/webview windows, accessibility and OS integration on all three
+desktop platforms remain separate manual acceptance work. Hosted macOS/Windows
+compilation and display-free tests are recorded in the platform notes. Keep
 [ACCEPTANCE](docs/ACCEPTANCE.md) honest when adding coverage.
 
 ## Clean-room boundary
