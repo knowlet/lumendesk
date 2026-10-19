@@ -2,6 +2,7 @@
 mod build;
 mod config;
 mod doctor;
+mod license_overrides;
 mod output;
 mod package;
 mod scaffold;

@@ -13,7 +13,9 @@ static NEXT: AtomicU64 = AtomicU64::new(0);
 struct Temp(PathBuf);
 impl Temp {
     fn new() -> Self {
-        let path = std::env::temp_dir().join(format!(
+        // macOS commonly exposes TMPDIR through /var -> /private/var. Use the
+        // real fixture root so archive tests do not accidentally request symlinks.
+        let path = std::env::temp_dir().canonicalize().unwrap().join(format!(
             "lumendesk-package-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::SeqCst)
@@ -367,21 +369,112 @@ fn input_links_and_output_symlink_components_are_rejected() {
 }
 #[cfg(unix)]
 #[test]
-fn hardlink_inputs_and_cross_platform_path_escapes_fail_closed() {
-    for hardlink in [false, true] {
+fn cross_platform_path_escapes_fail_closed() {
+    for name in ["..\\outside.rs", "quote\".rs", "COM¹.rs", "LPT².rs"] {
         let temp = Temp::new();
         let app = fixture(&temp);
-        if hardlink {
-            fs::write(temp.join("outside.rs"), "external private data").unwrap();
-            fs::hard_link(temp.join("outside.rs"), app.join("src/external.rs")).unwrap();
-        } else {
-            fs::write(app.join("src/..\\outside.rs"), "trick path").unwrap();
-        }
+        fs::write(app.join("src").join(name), "trick path").unwrap();
         let output = temp.join("unsafe.tar.gz");
         let result = package(&app, &output, "source");
         assert!(!result.status.success(), "{}", text(&result));
         assert!(!output.exists());
     }
+}
+#[test]
+fn hardlink_inputs_fail_closed_on_each_supported_platform() {
+    let temp = Temp::new();
+    let app = fixture(&temp);
+    fs::write(temp.join("outside.rs"), "external private data").unwrap();
+    fs::hard_link(temp.join("outside.rs"), app.join("src/external.rs")).unwrap();
+    let output = temp.join("unsafe.tar.gz");
+    let result = package(&app, &output, "source");
+    assert!(!result.status.success(), "{}", text(&result));
+    assert!(text(&result).contains("hard-linked"), "{}", text(&result));
+    assert!(!output.exists());
+}
+#[cfg(windows)]
+#[test]
+fn junction_inputs_and_output_parents_fail_closed() {
+    for input in [true, false] {
+        let temp = Temp::new();
+        let app = fixture(&temp);
+        let outside = temp.join("outside");
+        fs::create_dir(&outside).unwrap();
+        fs::write(outside.join("private.rs"), "outside bytes").unwrap();
+        let link = if input {
+            app.join("src/junction")
+        } else {
+            temp.join("junction")
+        };
+        // Directory junction creation does not require the symlink privilege.
+        let result = Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&link)
+            .arg(&outside)
+            .output()
+            .unwrap();
+        assert!(result.status.success(), "{}", text(&result));
+        let archive = if input {
+            temp.join("junction.tar.gz")
+        } else {
+            link.join("junction.tar.gz")
+        };
+        let result = package(&app, &archive, "source");
+        // Remove the junction explicitly so fixture cleanup cannot recurse into it.
+        fs::remove_dir(&link).unwrap();
+        assert!(!result.status.success(), "{}", text(&result));
+        assert!(text(&result).contains("reparse point"), "{}", text(&result));
+        assert!(!outside.join("junction.tar.gz").exists());
+        assert_eq!(
+            fs::read_to_string(outside.join("private.rs")).unwrap(),
+            "outside bytes"
+        );
+    }
+}
+#[cfg(unix)]
+#[test]
+fn fifo_configuration_is_rejected_without_blocking_on_a_reader() {
+    use std::process::Stdio;
+    use std::time::{Duration, Instant};
+    let temp = Temp::new();
+    let app = fixture(&temp);
+    fs::remove_file(app.join("lumendesk.toml")).unwrap();
+    assert!(
+        Command::new("mkfifo")
+            .arg(app.join("lumendesk.toml"))
+            .status()
+            .unwrap()
+            .success()
+    );
+    let archive = temp.join("fifo.tar.gz");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_lumendesk"))
+        .args(["package", "--offline", "--project"])
+        .arg(&app)
+        .args(["--kind", "source", "--out"])
+        .arg(&archive)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let completed = loop {
+        if child.try_wait().unwrap().is_some() {
+            break true;
+        }
+        if Instant::now() >= deadline {
+            child.kill().unwrap();
+            break false;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    let result = child.wait_with_output().unwrap();
+    assert!(
+        completed,
+        "packaging blocked while reading a FIFO configuration"
+    );
+    assert!(!result.status.success(), "{}", text(&result));
+    assert!(text(&result).contains("regular file"), "{}", text(&result));
+    assert!(!archive.exists());
 }
 #[test]
 fn unsupported_local_dependencies_and_configured_escape_fail() {
@@ -436,6 +529,7 @@ fn real_web_source_archive_builds_and_retains_sdk_test_fixtures() {
         "_sdk/assets/stream.html",
         "_sdk/crates/lumendesk/src/web_streams.rs",
         "_sdk/crates/lumendesk/tests/stream-frames.json",
+        "_sdk/crates/lumendesk/tests/session-delivery.json",
         "_sdk/crates/lumendesk-core/src/lib.rs",
         "_sdk/crates/lumendesk/LICENSE-MIT",
         "_sdk/crates/lumendesk-core/LICENSE-APACHE",
@@ -507,4 +601,7 @@ fn real_web_source_archive_builds_and_retains_sdk_test_fixtures() {
             .contains("webview::tests::bundled_assets_embed_all_resources_and_reject_traversal")
     );
     assert!(text(&result).contains("web_streams::tests::slow_consumer_has_no_unsolicited_values_and_completion_follows_last_item"));
+    assert!(text(&result).contains(
+        "webview::tests::delivery_scripts_bind_the_execution_to_the_original_page_session"
+    ));
 }

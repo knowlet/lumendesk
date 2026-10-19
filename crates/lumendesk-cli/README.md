@@ -123,11 +123,30 @@ Every archive contains:
   and every payload file's byte length, mode and SHA-256. The manifest itself is
   excluded from its own checksum to avoid self-reference.
 - `DEPENDENCIES.json`: resolved dependency versions, declared license expressions,
-  registry/source identifiers and paths of the license notices included.
-- `dependency-licenses/`: available top-level LICENSE, LICENCE, COPYING, NOTICE,
-  AUTHORS files and explicitly declared Cargo license files. Dependencies lacking
-  these files have an empty notice list; review those before redistribution.
+  registry/source identifiers, included notice paths and provenance, exact registry
+  archive hashes, source-verification status and unresolved license review items.
+  Source archives describe the complete resolved graph. Binary archives select the
+  host target's normal/build dependency closure, excluding development-only edges;
+  this is a conservative build-input inventory, not a linked-object analysis.
+- `dependency-licenses/`: available LICENSE, LICENCE, COPYING, NOTICE, AUTHORS,
+  COPYRIGHT and UNLICENSE files, including bounded recursive inspection and
+  explicitly declared Cargo license files. Exact package/checksum-bound supplements
+  preserve reviewed upstream texts omitted from published crates. A changed version,
+  registry, license expression or archive checksum cannot inherit those supplements.
+- `DEPENDENCY-SOURCES.txt`: verified versioned registry source locations and hashes.
+  Expected but unverified locations and their status remain in `DEPENDENCIES.json`.
+  Reviewed supplements and verified source-availability statements require checking
+  both the cached `.crate` hash and its local source tree. Modified, extra or missing
+  source files remain visible as unresolved review items; the only ignored extraction
+  marker is a checked, bounded regular `.cargo-ok` file.
 - `PACKAGE-NOTES.txt`: rebuild/run instructions and runtime/license boundaries.
+
+Empty notice lists and unresolved review items must be examined before release.
+An included notice is not proof that every obligation has been met, and archive
+creation leaves `license_review_required` and `redistribution_review_required`
+true. See [the redistribution review](../../docs/REDISTRIBUTION.md) for the pinned
+275-dependency web inventory, the 31 original notice gaps, Microsoft loader and
+native font notices, and outstanding Apple/system-library/native release questions.
 
 Archive entries are sorted; file modes are normalized, owners and timestamps are
 zeroed, and the gzip header has no filename/time/host variation. Identical payloads
@@ -176,9 +195,13 @@ manifest makes the exact payload reviewable; an allowlist cannot identify secret
 someone embeds in otherwise ordinary Rust/JSON/text files.
 
 Selected source files, local dependency paths and output path components reject
-symlinks. Source hardlinks, special files, parent traversal, backslashes, absolute
-archive paths, Windows reserved names and case-insensitive filename collisions
-are rejected. Cargo's normal hard-linked executable artifacts are read as bytes
+symlinks and Windows reparse points. Selected configuration is inspected before
+parsing or invoking Cargo. Actual opened files are checked before bounded reads;
+source hardlinks and special files are rejected on the supported desktop systems.
+Parent traversal, backslashes, absolute archive paths, Windows reserved names and
+invalid characters, file/directory prefix conflicts, and case or canonically
+equivalent Unicode component collisions are rejected. This normalization does not
+claim to model every filesystem's name-equivalence rules. Cargo's normal hard-linked executable artifacts are read as bytes
 and archived as a regular executable file; no archive hardlinks/symlinks are emitted.
 Do not modify an input tree concurrently with packaging: this is a snapshot utility,
 not a hardened sandbox against a malicious process changing the filesystem during
@@ -242,6 +265,10 @@ allowlist exclusions, symlink/hardlink/path rejection, preservation of existing
 outputs, a source rebuild after deleting the original app and SDK, and execution
 of an extracted display-free binary. A real extracted web scaffold is also built
 with the local platform development libraries; its GUI is not launched.
+The path/link and archive integrity tests run on Linux, macOS and Windows CI,
+including Windows junctions and Unix FIFO configuration rejection where supported.
+Unit fixtures also check target/development dependency selection, nested notice
+collection, pinned supplement identities and modified registry-source detection.
 
 Integration tests cover both scaffold modes, preserving existing data, symlink
 rejection, argument/config errors, deterministic generation, a real offline

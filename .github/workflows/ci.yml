@@ -82,6 +82,8 @@ jobs:
         run: cargo test -p lumendesk-core --locked
       - name: Compile and link the CLI
         run: cargo build -p lumendesk-cli --locked
+      - name: Test portable archive paths, links and integrity without GUI
+        run: cargo test -p lumendesk-cli --lib --test package --locked
       - name: Test SDK contracts without creating OS windows
         run: cargo test -p lumendesk --lib --all-features --locked
       - name: Compile and link all native and webview examples
