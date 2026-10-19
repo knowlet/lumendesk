@@ -9,6 +9,11 @@
   let closed = false;
   const transport = window.ipc && window.ipc.postMessage.bind(window.ipc);
   if (!transport) return;
+  const sessionJson = JSON.stringify(token);
+  // Fields are serialized exactly once before allocating the admission ID.
+  // Only fixed envelope syntax and already-encoded JSON are joined here.
+  const requestMessage = (kind, id, fields) =>
+    `{"session":${sessionJson},"${kind}":{"id":${id},${fields.slice(1)}}`;
   const rejectAll = () => {
     closed = true;
     for (const entry of pending.values()) {
@@ -30,13 +35,11 @@
     if(signal!==undefined && !isSignal(signal)) throw new TypeError('Invalid abort signal');
     const abortError=()=>{const error=new Error('Call aborted');error.name='AbortError';error.code='cancelled';return error;};
     if(signal && signal.aborted) {reject(abortError());return;}
-    const id = nextId++;
+    let id;
     const timeout = Math.min(Math.max(options.timeoutMs || 30000, 1), 300000);
-    // Serialize before registering a call: user-provided toJSON may abort it.
-    const message=JSON.stringify({session:token,request:{id,method,args}});
-    if(signal && signal.aborted) {reject(abortError());return;}
-    if(closed) {reject(new Error('Page session ended'));return;}
-    if(pending.size + streams.size >= 32) {reject(new Error('Too many pending calls or streams'));return;}
+    // Serialization and instrumented AbortSignal accessors/listener methods can
+    // submit nested work. Finish all of them before selecting the next ID.
+    const fields=JSON.stringify({method,args});
     let timer;
     const cleanup=()=>{clearTimeout(timer);if(signal)signal.removeEventListener('abort',onAbort);};
     const cancel=error=>{
@@ -46,12 +49,15 @@
       reject(error);
     };
     const onAbort=()=>cancel(abortError());
-    timer=setTimeout(()=>cancel(new Error('Call timed out')),timeout);
-    pending.set(id, {resolve,reject,cleanup});
     try {
       if(signal)signal.addEventListener('abort',onAbort,{once:true});
-      if(signal && signal.aborted) {onAbort();return;}
-      transport(message);
+      if(signal && signal.aborted) throw abortError();
+      if(closed) throw new Error('Page session ended');
+      if(pending.size + streams.size >= 32) throw new Error('Too many pending calls or streams');
+      timer=setTimeout(()=>cancel(new Error('Call timed out')),timeout);
+      id=nextId++;
+      pending.set(id, {resolve,reject,cleanup});
+      transport(requestMessage('request',id,fields));
     } catch (error) { cleanup(); pending.delete(id); reject(error); }
   });
   const stream = (method, args, options = {}) => {
@@ -170,18 +176,19 @@
       if (signal && signal.aborted) throw abortError();
       const duration = Number(options.timeoutMs || 30000);
       timeout = Number.isFinite(duration) ? Math.min(Math.max(duration, 1), 300000) : 30000;
-      id = nextId++;
-      const message = JSON.stringify({ session: token, stream: { id, method, args } });
-      // Serialization may run user code: recheck authority and both capacity limits.
+      const fields = JSON.stringify({ method, args });
+      if (signal) signal.addEventListener('abort', onAbort, { once: true });
+      // Serialization and listener registration may run user code: recheck
+      // authority/capacity, then allocate in actual transport submission order.
       if (signal && signal.aborted) throw abortError();
       if (closed) throw new Error('Page session ended');
       if (streams.size >= 16) throw new Error('Too many live streams');
       if (pending.size + streams.size >= 32) throw new Error('Too many pending calls or streams');
-      streams.set(id, { receive, cancel });
       armTimeout();
-      if (signal) signal.addEventListener('abort', onAbort, { once: true });
-      if (signal && signal.aborted) onAbort();
-      if (active()) { sent = true; transport(message); }
+      id = nextId++;
+      streams.set(id, { receive, cancel });
+      sent = true;
+      transport(requestMessage('stream', id, fields));
     } catch (error) {
       if (active()) cancel(error);
       else { cleanup(); terminal = { kind: 'error', value: error }; rejectResult(error); }
@@ -215,7 +222,8 @@
     listeners.get(name).add(entry);
     return () => { const set=listeners.get(name); if(set) {set.delete(entry); if(!set.size) listeners.delete(name);} };
   };
-  Object.defineProperty(window,'__lumenResponse',{value:response=>{
+  Object.defineProperty(window,'__lumenResponse',{value:(session,response)=>{
+    if(closed || session!==token) return;
     if(!response || typeof response!=='object' || Array.isArray(response)) return;
     const id=response.id;
     const entry=pending.get(id); if(!entry) return;
@@ -231,7 +239,8 @@
     pending.delete(id); entry.cleanup();
     if(error) entry.reject(error); else entry.resolve(value);
   },writable:false,configurable:false});
-  Object.defineProperty(window, '__lumenStream', { value: frame => {
+  Object.defineProperty(window, '__lumenStream', { value: (session, frame) => {
+    if (closed || session !== token) return;
     // Unidentifiable, unknown and late frames never consume another stream's credit.
     try {
       if (!frame || typeof frame !== 'object' || Array.isArray(frame)) return;
@@ -241,7 +250,8 @@
       if (entry) entry.receive(frame);
     } catch (_) {}
   }, writable: false, configurable: false });
-  Object.defineProperty(window,'__lumenEvent',{value:(name,value)=>{
+  Object.defineProperty(window,'__lumenEvent',{value:(session,name,value)=>{
+    if(closed || session!==token) return;
     const set=listeners.get(name); if(!set)return;
     for(const entry of Array.from(set)) {
       if(entry.once)set.delete(entry);

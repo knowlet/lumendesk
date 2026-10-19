@@ -671,3 +671,63 @@ fn dropping_an_old_receiver_cannot_release_a_new_session_request() {
         Ok(StreamResponseItem::Complete(Ok(json!("done"))))
     );
 }
+
+#[test]
+fn oversized_terminal_errors_are_bounded_after_accepted_values() {
+    let (bridge, auth) = configured(1, 128);
+    bridge
+        .register_stream::<(), u32, (), _>(
+            StreamMethodSchema::new("fail", Schema::Null, Schema::Integer, Schema::Null),
+            |_, _, sink| {
+                sink.send(7)?;
+                Err(CoreError::Backend("失敗".repeat(64)))
+            },
+        )
+        .unwrap();
+    let (job, receiver) = bridge
+        .begin_stream(&auth, request(1, "fail", Value::Null), 1)
+        .unwrap();
+    job.run();
+    assert_eq!(
+        next(&receiver),
+        Ok(StreamResponseItem::Value {
+            sequence: 0,
+            value: json!(7),
+        })
+    );
+    assert_eq!(
+        next(&receiver),
+        Ok(StreamResponseItem::Complete(Err(
+            CoreError::PayloadTooLarge
+        )))
+    );
+    assert_eq!(receiver.try_next(), Ok(None));
+
+    bridge
+        .register::<(), (), _>(
+            MethodSchema::new("call-fail", Schema::Null, Schema::Null),
+            |_, _| Err(CoreError::Backend("失敗".repeat(64))),
+        )
+        .unwrap();
+    assert_eq!(
+        bridge
+            .dispatch(&auth, request(2, "call-fail", Value::Null))
+            .result,
+        Err(CoreError::PayloadTooLarge)
+    );
+}
+
+#[test]
+fn admission_errors_cannot_expand_a_valid_request_past_the_result_limit() {
+    let (bridge, auth) = configured(1, 128);
+    let unknown = request(1, &"m".repeat(94), Value::Null);
+    assert!(serde_json::to_vec(&unknown).unwrap().len() <= 128);
+    assert_eq!(
+        bridge.dispatch(&auth, unknown.clone()).result,
+        Err(CoreError::PayloadTooLarge)
+    );
+    assert!(matches!(
+        bridge.begin_stream(&auth, unknown, 1),
+        Err(CoreError::PayloadTooLarge)
+    ));
+}

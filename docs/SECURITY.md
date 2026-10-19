@@ -46,9 +46,13 @@ sanitizer. A malicious trusted script has the app's bridge privileges.
 
 ## Bounds and lifetime
 
-Wire messages are capped at 1 MiB. The frontend permits 32 pending calls. Each
+Incoming wire messages are capped at 1 MiB. The core separately bounds encoded
+request/item/success/error payloads; outgoing callback envelopes and JSON-string
+escaping add bytes beyond that payload threshold. The frontend permits 32
+pending calls. Each
 web window has a bounded, ordered 32-job worker queue. Timeout requests cancellation
-and drops the frontend promise. There is one backend worker per web window;
+and drops the frontend promise. Each window has one ordered admission/ordinary-call
+worker. Streaming producers run separately under the retained worker-permit limits;
 handlers must return cooperatively and must not block forever. Rust cannot safely
 force-stop arbitrary user code.
 
@@ -66,6 +70,16 @@ retain their worker permit until they actually exit. This prevents cancellation
 from becoming a way to spawn unlimited threads. Incoming command queues are also
 bounded; raw IPC flooding is dropped and times out. Cancellation signals reach
 the core immediately, bypassing a saturated incoming queue.
+The host reclaims cancelled stream slots without requiring read credit or a
+queued cancellation command, while noncooperative worker permits remain held
+until the worker exits. Oversized terminal errors are replaced before they can
+be cloned into stream completion slots.
+
+Host-generated callbacks carry the target session into the JavaScript closure,
+which rechecks it at execution time. JSON payloads are parsed from escaped
+strings, preserving keys such as `__proto__` as data. Shared Rust/Node fixtures
+exercise delayed-delivery and data-integrity contracts; actual engine navigation
+and iframe behavior remain unverified.
 
 The runtime defaults to a 30-second idle/read timeout. The host enforces a
 60-second idle/read ceiling and sends an explicit terminal error on expiry, even

@@ -127,12 +127,14 @@ impl StreamBook {
         let mut output = vec![];
         let mut remove = vec![];
         for (&(window, id), slot) in &mut self.slots {
-            if bridge.authorize(&slot.auth).is_err() {
-                let _ = bridge.cancel(&slot.auth, id);
-                remove.push((window, id));
-                continue;
-            }
-            if now.saturating_duration_since(slot.last_activity) >= IDLE_TIMEOUT {
+            let cancelled = match bridge.is_request_cancelled(&slot.auth, id) {
+                Ok(cancelled) => cancelled,
+                Err(_) => {
+                    remove.push((window, id));
+                    continue;
+                }
+            };
+            if !cancelled && now.saturating_duration_since(slot.last_activity) >= IDLE_TIMEOUT {
                 let _ = bridge.cancel(&slot.auth, id);
                 let result: Result<Value, CoreError> = Err(CoreError::Backend(
                     "stream exceeded the host's 60-second idle/read timeout".into(),
@@ -145,7 +147,12 @@ impl StreamBook {
                 remove.push((window, id));
                 continue;
             }
-            let next = if let Some(error) = slot.error.take() {
+            // Cancellation is signalled immediately by IPC and must not depend
+            // on admitting its queued command, attaching a receiver or pulling
+            // another item. This check does not consume read credit or data.
+            let next = if cancelled {
+                Some(Err(CoreError::Cancelled))
+            } else if let Some(error) = slot.error.take() {
                 Some(Err(error))
             } else if slot.credit {
                 slot.receiver
@@ -348,5 +355,42 @@ mod tests {
         bridge.navigate(auth.window).unwrap();
         assert!(book.poll(&bridge, Instant::now()).is_empty());
         assert!(book.slots.is_empty());
+    }
+
+    #[test]
+    fn immediate_cancellation_reclaims_stream_without_a_queued_command_or_read_credit() {
+        for admitted in [false, true] {
+            let (bridge, auth) = fixture();
+            let mut book = StreamBook::default();
+            book.reserve(auth.clone(), 1).unwrap();
+            let request = crate::core::CallRequest {
+                id: 1,
+                method: "count".into(),
+                args: serde_json::json!(1),
+            };
+            if admitted {
+                let (call, receiver) = bridge.begin_stream(&auth, request.clone(), 1).unwrap();
+                call.run();
+                book.attach(&auth, 1, Ok(receiver));
+            }
+            // The IPC handler signals the core immediately even if its bounded
+            // command queue cannot admit the corresponding Cancel command.
+            assert_eq!(bridge.cancel(&auth, 1), Ok(true));
+            let frames = book.poll(&bridge, Instant::now());
+            assert_eq!(frames.len(), 1);
+            assert_eq!(frames[0].2["result"]["Err"]["code"], "cancelled");
+            assert!(book.slots.is_empty());
+            if admitted {
+                // Removal releases the core's pending request, not only the UI slot.
+                assert_eq!(bridge.cancel(&auth, 1), Ok(false));
+            } else {
+                // Polling did not consume a tombstone needed to prevent a late
+                // queued job from beginning after its UI slot was reclaimed.
+                assert!(matches!(
+                    bridge.begin_stream(&auth, request, 1),
+                    Err(CoreError::Cancelled)
+                ));
+            }
+        }
     }
 }

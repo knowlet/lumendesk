@@ -448,21 +448,21 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
                 if let Some(window) = open.get(&id)
                     && window.session.as_ref() == Some(&token)
                 {
-                    let script = format!("window.__lumenResponse && window.__lumenResponse({});", serde_json::to_string(&response).unwrap());
+                    let script = response_script(&token, &response);
                     let _ = window.view.evaluate_script(&script);
                 }
             }
             Event::MainEventsCleared => {
                 route_commands(&mut open,&app.bridge,&mut streams,&call_budget,&stream_budget);
                 for (id,token,frame) in streams.poll(&app.bridge,Instant::now()) {
-                    if let Some(window)=open.get(&id) && window.session.as_ref()==Some(&token) {send_stream_frame(&window.view,&frame);}
+                    if let Some(window)=open.get(&id) && window.session.as_ref()==Some(&token) {send_stream_frame(&window.view,&token,&frame);}
                 }
                 for (id, window) in &open {
-                    if window.session.is_some() {
+                    if let Some(token) = &window.session {
                         let events = app.sender.state.lock().unwrap().queues.get_mut(id)
                             .map(std::mem::take).unwrap_or_default();
                         for event in events {
-                            deliver_event(&window.view, &event);
+                            deliver_event(&window.view, token, &event);
                         }
                     }
                 }
@@ -484,14 +484,35 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
     });
     Ok(())
 }
-fn send_stream_frame(view: &WebView, frame: &Value) {
-    let _ = view.evaluate_script(&format!(
-        "window.__lumenStream && window.__lumenStream({frame});"
-    ));
+// Bind at JavaScript execution time as well as host enqueue time. Engine script
+// evaluation is asynchronous; request IDs restart in a replacement page.
+fn json_script_argument(value: &impl serde::Serialize) -> String {
+    // JSON object keys such as __proto__ are data. A JavaScript object literal
+    // interprets that key as a prototype setter, so parse an escaped JSON string.
+    let json = serde_json::to_string(value).unwrap();
+    format!("JSON.parse({})", serde_json::to_string(&json).unwrap())
 }
-fn stream_error(view: &WebView, id: u64, error: CoreError) {
+fn response_script(token: &SessionToken, response: &CallResponse) -> String {
+    format!(
+        "window.__lumenResponse && window.__lumenResponse({},{});",
+        serde_json::to_string(token).unwrap(),
+        json_script_argument(response)
+    )
+}
+fn stream_script(token: &SessionToken, frame: &Value) -> String {
+    format!(
+        "window.__lumenStream && window.__lumenStream({},{});",
+        serde_json::to_string(token).unwrap(),
+        json_script_argument(frame)
+    )
+}
+fn send_stream_frame(view: &WebView, token: &SessionToken, frame: &Value) {
+    let _ = view.evaluate_script(&stream_script(token, frame));
+}
+fn stream_error(view: &WebView, token: &SessionToken, id: u64, error: CoreError) {
     send_stream_frame(
         view,
+        token,
         &serde_json::json!({"id":id,"done":true,"result":Result::<Value,CoreError>::Err(error)}),
     );
 }
@@ -514,6 +535,7 @@ fn route_commands(
             match command {
                 Command::Call(request) => {
                     let id = request.id;
+                    let token = auth.session.clone();
                     let result = call_budget.acquire(128).and_then(|permit| {
                         window
                             .jobs
@@ -525,16 +547,15 @@ fn route_commands(
                             id,
                             result: Err(error),
                         };
-                        let _ = window.view.evaluate_script(&format!(
-                            "window.__lumenResponse({});",
-                            serde_json::to_string(&response).unwrap()
-                        ));
+                        let _ = window
+                            .view
+                            .evaluate_script(&response_script(&token, &response));
                     }
                 }
                 Command::Stream(request) => {
                     let id = request.id;
                     match streams.reserve(auth.clone(), id) {
-                        Err(error) => stream_error(&window.view, id, error),
+                        Err(error) => stream_error(&window.view, &auth.session, id, error),
                         Ok(()) => {
                             let result = stream_budget.acquire(MAX_STREAMS).and_then(|permit| {
                                 window
@@ -544,7 +565,7 @@ fn route_commands(
                             });
                             if let Err(error) = result {
                                 streams.remove(auth.window, id);
-                                stream_error(&window.view, id, error);
+                                stream_error(&window.view, &auth.session, id, error);
                             }
                         }
                     }
@@ -553,7 +574,7 @@ fn route_commands(
                     if let Err(error) = streams.credit(&auth, id) {
                         let _ = bridge.cancel(&auth, id);
                         streams.remove(auth.window, id);
-                        stream_error(&window.view, id, error);
+                        stream_error(&window.view, &auth.session, id, error);
                     }
                 }
                 Command::Cancel(id) => {
@@ -581,13 +602,16 @@ fn origin_only(url: &str) -> String {
         })
         .unwrap_or_default()
 }
-fn deliver_event(view: &WebView, event: &HostEvent) {
-    let script = format!(
-        "window.__lumenEvent && window.__lumenEvent({},{});",
+fn event_script(token: &SessionToken, event: &HostEvent) -> String {
+    format!(
+        "window.__lumenEvent && window.__lumenEvent({},{},{});",
+        serde_json::to_string(token).unwrap(),
         serde_json::to_string(&event.name).unwrap(),
-        event.payload
-    );
-    let _ = view.evaluate_script(&script);
+        json_script_argument(&event.payload)
+    )
+}
+fn deliver_event(view: &WebView, token: &SessionToken, event: &HostEvent) {
+    let _ = view.evaluate_script(&event_script(token, event));
 }
 
 #[derive(Deserialize)]
@@ -671,6 +695,32 @@ pub fn run_demo(options: WindowOptions) -> Result<(), DesktopError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn delivery_scripts_bind_the_execution_to_the_original_page_session() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../tests/session-delivery.json")).unwrap();
+        let token: SessionToken = serde_json::from_value(fixture["session"].clone()).unwrap();
+        let payload = fixture["payload"].clone();
+        let scripts = [
+            response_script(
+                &token,
+                &CallResponse {
+                    id: 1,
+                    result: Ok(payload.clone()),
+                },
+            ),
+            stream_script(&token, &serde_json::json!({"id":2,"item":payload})),
+            event_script(
+                &token,
+                &HostEvent {
+                    name: "changed".into(),
+                    payload,
+                },
+            ),
+        ];
+        assert_eq!(serde_json::to_value(scripts).unwrap(), fixture["scripts"]);
+    }
+
     fn app() -> WebApplication {
         let bridge = Bridge::new(BridgeConfig::production(APP_ORIGIN).unwrap()).unwrap();
         let mut app = WebApplication::new(bridge);

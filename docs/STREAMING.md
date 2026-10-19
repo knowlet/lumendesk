@@ -8,6 +8,9 @@ capacity and observes cooperative cancellation. No entire stream is collected.
 The host admits ordinary calls and streaming starts through one ordered worker
 per window, keeping the shared request-ID namespace ordered. Streaming producers
 run separately so waiting for a slow consumer never blocks ordinary calls.
+The frontend serializes arguments and registers its abort listener before
+allocating the ID, so nested calls from `toJSON` or signal instrumentation cannot
+reverse transport admission order.
 
 JavaScript usage:
 
@@ -40,6 +43,8 @@ exposes the standard AbortSignal form.
 - Backend errors terminate after previously queued items. Cancellation discards
   buffered work and rejects pending reads/result.
 - `return`, `throw`, AbortSignal, pagehide, navigation and window close cancel.
+  Host cancellation polling does not require a read credit or delivery of the
+  queued cancel command; pre-cancel tombstones still suppress delayed jobs.
 - Frontend limit: 16 live streams and 32 combined active streams/calls.
 - Host limit: 64 streams total, 16/window, 16 windows, 128 normal calls, and bounded
   incoming/worker queues. A cancelled backend that ignores cancellation keeps its
@@ -61,7 +66,11 @@ node --test tests/runtime.test.mjs
 
 The shared `crates/lumendesk/tests/stream-frames.json` is asserted by Rust host tests and
 consumed verbatim by JavaScript tests. This catches mismatched transport shape.
+`session-delivery.json` also checks the actual host-generated callback scripts:
+they carry the original session and parse escaped JSON so data keys such as
+`__proto__` retain ordinary JSON semantics. A replacement runtime rejects an old
+session's response, stream item or event even if its request ID is reused.
 Tests exercise a slow consumer, cancellation while full, terminal ordering,
 malformed frames, registration errors, timeouts, session invalidation and caps.
-These checks do not substitute for running a real OS webview; that remains blocked
-by this environment's display-socket restriction.
+These checks do not substitute for running a real OS WebView. Real OS WebView
+acceptance was not performed in this review.

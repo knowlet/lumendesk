@@ -69,6 +69,9 @@ impl TrustedOrigin {
 #[derive(Debug, Clone)]
 pub struct BridgeConfig {
     pub trusted_origins: Vec<TrustedOrigin>,
+    /// Encoded byte threshold for requests, successful values, stream items and
+    /// serialized errors. Oversized results become `PayloadTooLarge`; transport
+    /// envelopes have their own overhead and require a separate host wire limit.
     pub max_payload_bytes: usize,
     pub max_pending_per_session: usize,
 }
@@ -355,6 +358,16 @@ impl Bridge {
         request: CallRequest,
         capacity: usize,
     ) -> Result<(StreamCall, BridgeStreamReceiver)> {
+        self.begin_stream_inner(auth, request, capacity)
+            .map_err(|error| self.bound_error(error))
+    }
+
+    fn begin_stream_inner(
+        &self,
+        auth: &Authorization,
+        request: CallRequest,
+        capacity: usize,
+    ) -> Result<(StreamCall, BridgeStreamReceiver)> {
         if capacity == 0 {
             return Err(CoreError::InvalidConfiguration(
                 "stream capacity must be positive".into(),
@@ -419,7 +432,7 @@ impl Bridge {
             return Err(CoreError::PayloadTooLarge);
         }
         let request = serde_json::from_slice(bytes)
-            .map_err(|error| CoreError::InvalidArguments(error.to_string()))?;
+            .map_err(|error| self.bound_error(CoreError::InvalidArguments(error.to_string())))?;
         self.begin_stream(auth, request, capacity)
     }
 
@@ -534,6 +547,24 @@ impl Bridge {
         Ok(true)
     }
 
+    /// Observe cancellation for admitted work or a request waiting in a host
+    /// queue, without consuming its pre-cancel tombstone or a stream item.
+    /// A request with neither a pending token nor a tombstone returns `false`.
+    pub fn is_request_cancelled(&self, auth: &Authorization, request_id: u64) -> Result<bool> {
+        if request_id > 9_007_199_254_740_991 {
+            return Err(CoreError::InvalidArguments(
+                "request IDs must be JavaScript-safe integers".into(),
+            ));
+        }
+        let mut state = self.0.state.lock().unwrap();
+        let session = self.check_authorization(&mut state, auth)?;
+        Ok(session.precancelled.contains(&request_id)
+            || session
+                .pending
+                .get(&request_id)
+                .is_some_and(CancellationToken::is_cancelled))
+    }
+
     /// Recheck on the host UI thread before delivering a completed response.
     pub fn authorize(&self, auth: &Authorization) -> Result<()> {
         self.check_authorization(&mut self.0.state.lock().unwrap(), auth)
@@ -545,7 +576,7 @@ impl Bridge {
             return Err(CoreError::PayloadTooLarge);
         }
         let request = serde_json::from_slice(bytes)
-            .map_err(|e| CoreError::InvalidArguments(e.to_string()))?;
+            .map_err(|e| self.bound_error(CoreError::InvalidArguments(e.to_string())))?;
         Ok(self.dispatch(auth, request))
     }
 
@@ -553,7 +584,32 @@ impl Bridge {
         let id = request.id;
         CallResponse {
             id,
-            result: self.dispatch_inner(auth, request),
+            result: self
+                .dispatch_inner(auth, request)
+                .map_err(|error| self.bound_error(error)),
+        }
+    }
+
+    fn check_result_size<T: Serialize>(&self, value: &T) -> Result<()> {
+        let bytes = serde_json::to_vec(value)
+            .map_err(|error| CoreError::InvalidResult(error.to_string()))?;
+        if bytes.len() > self.0.config.max_payload_bytes {
+            return Err(CoreError::PayloadTooLarge);
+        }
+        Ok(())
+    }
+
+    fn bound_error(&self, error: CoreError) -> CoreError {
+        self.check_result_size(&error).err().unwrap_or(error)
+    }
+
+    fn bound_result(&self, result: Result<Value>) -> Result<Value> {
+        match result {
+            Ok(value) => {
+                self.check_result_size(&value)?;
+                Ok(value)
+            }
+            Err(error) => Err(self.bound_error(error)),
         }
     }
 
@@ -625,17 +681,9 @@ impl Bridge {
             cancellation: cancellation.clone(),
             streams: streams.clone(),
         };
-        let mut result = catch_unwind(AssertUnwindSafe(|| handler(context, request.args)))
+        let result = catch_unwind(AssertUnwindSafe(|| handler(context, request.args)))
             .unwrap_or(Err(CoreError::BackendPanic));
-        if let Ok(value) = &result {
-            match serde_json::to_vec(value) {
-                Ok(bytes) if bytes.len() > self.0.config.max_payload_bytes => {
-                    result = Err(CoreError::PayloadTooLarge)
-                }
-                Err(error) => result = Err(CoreError::InvalidResult(error.to_string())),
-                _ => (),
-            }
-        }
+        let mut result = self.bound_result(result);
         {
             let mut state = self.0.state.lock().unwrap();
             if cancellation.is_cancelled() || self.check_authorization(&mut state, auth).is_err() {
@@ -695,16 +743,10 @@ impl StreamCall {
         &self.auth
     }
 
-    fn finish(&self, mut result: Result<Value>) {
-        if let Ok(value) = &result {
-            match serde_json::to_vec(value) {
-                Ok(bytes) if bytes.len() > self.bridge.0.config.max_payload_bytes => {
-                    result = Err(CoreError::PayloadTooLarge);
-                }
-                Err(error) => result = Err(CoreError::InvalidResult(error.to_string())),
-                _ => (),
-            }
-        }
+    fn finish(&self, result: Result<Value>) {
+        // Bound errors as well as successful values before cloning a terminal
+        // error into the call's stream-completion slots.
+        let mut result = self.bridge.bound_result(result);
         if self.context.cancellation.is_cancelled() || self.bridge.authorize(&self.auth).is_err() {
             result = Err(CoreError::Cancelled);
         }

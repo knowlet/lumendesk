@@ -27,7 +27,7 @@ function trackedAbortController() {
   return { controller, signal, listeners };
 }
 
-function makeRuntime({ iframe = false, ipc = true, throwTransport = false, throwTransportAt, existing } = {}) {
+function makeRuntime({ iframe = false, ipc = true, throwTransport = false, throwTransportAt, existing, session = SESSION } = {}) {
   const outbound = [];
   const errors = [];
   const timers = new Map();
@@ -69,15 +69,16 @@ function makeRuntime({ iframe = false, ipc = true, throwTransport = false, throw
     setTimeout(callback, delay) { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
   });
-  const script = source.replace('__SESSION__', JSON.stringify(SESSION)).replace('__RUNTIME__', JSON.stringify(RUNTIME));
+  const script = source.replace('__SESSION__', JSON.stringify(session)).replace('__RUNTIME__', JSON.stringify(RUNTIME));
   const install = () => vm.runInContext(script, context, { filename: 'lumendesk/runtime.js' });
   install();
   return {
     window, outbound, errors, timers, dispatched, install,
+    evaluate(script) { vm.runInContext(script, context); },
     request(index = outbound.length - 1) { return outbound[index].request; },
-    respond(id, result) { window.__lumenResponse({ id, result }); },
-    emit(name, payload) { window.__lumenEvent(name, payload); },
-    streamFrame(frame) { window.__lumenStream(frame); },
+    respond(id, result) { window.__lumenResponse(session, { id, result }); },
+    emit(name, payload) { window.__lumenEvent(session, name, payload); },
+    streamFrame(frame) { window.__lumenStream(session, frame); },
     pagehide() { window.dispatchEvent({ type: 'pagehide' }); },
     fireTimer(id = timers.keys().next().value) {
       const entry = timers.get(id);
@@ -205,7 +206,7 @@ for (const [label, result] of [
     const rejection = assert.rejects(promise, error =>
       error.message === 'Malformed backend response' && error.code === 'malformed_response');
     const response = result === undefined ? { id: 1 } : { id: 1, result };
-    assert.doesNotThrow(() => r.window.__lumenResponse(response));
+    assert.doesNotThrow(() => r.window.__lumenResponse(SESSION, response));
     await rejection;
     assert.equal(r.timers.size, 0);
     r.respond(1, { Ok: 'late response ignored' });
@@ -220,7 +221,7 @@ test('unidentifiable malformed response envelopes leave valid calls and timers i
   const r = makeRuntime();
   const promise = r.window.lumen.call('echo', null);
   for (const response of [null, undefined, false, 42, 'bad', [], {}, { id: '1', result: null }]) {
-    assert.doesNotThrow(() => r.window.__lumenResponse(response));
+    assert.doesNotThrow(() => r.window.__lumenResponse(SESSION, response));
     assert.equal(r.timers.size, 1);
   }
   r.respond(1, { Ok: 'still pending until a matching reply' });
@@ -232,7 +233,7 @@ test('a throwing matching result accessor cannot strand its promise', async () =
   const r = makeRuntime();
   const promise = r.window.lumen.call('echo', null);
   const rejection = assert.rejects(promise, /Malformed backend response/);
-  assert.doesNotThrow(() => r.window.__lumenResponse({
+  assert.doesNotThrow(() => r.window.__lumenResponse(SESSION, {
     id: 1,
     get result() { throw new Error('invalid accessor'); },
   }));
@@ -1186,3 +1187,118 @@ test('host lifetime ceiling rejects a pending read even with a longer frontend t
   controller.abort();
   assert.equal(cancelFrames(r).length, 0, 'host terminal errors need no duplicate cancellation');
 });
+
+for (const outerKind of ['call', 'stream']) {
+  for (const innerKind of ['call', 'stream']) {
+    test(`reentrant ${outerKind} arguments keep ${innerKind} request IDs in transport order`, async () => {
+      const r = makeRuntime();
+      let inner;
+      let serializations = 0;
+      const outer = r.window.lumen[outerKind]('outer', {
+        toJSON() {
+          serializations++;
+          inner = r.window.lumen[innerKind]('inner', null);
+          return 'outer payload';
+        },
+      });
+      const requests = r.outbound.map(frame => frame.request || frame.stream);
+      // Settle everything even on the old, invalid ordering so this assertion
+      // measures admission order rather than leaving unresolved test work.
+      for (const frame of r.outbound.slice()) {
+        if (frame.request) r.respond(frame.request.id, { Ok: frame.request.method });
+        else completeStream(r, frame.stream.id, frame.stream.method);
+      }
+      assert.equal(await (innerKind === 'call' ? inner : inner.result), 'inner');
+      assert.equal(await (outerKind === 'call' ? outer : outer.result), 'outer');
+      assert.deepEqual(requests.map(request => request.id), [1, 2]);
+      assert.deepEqual(requests.map(request => request.method), ['inner', 'outer']);
+      assert.equal(requests[1].args, 'outer payload');
+      assert.equal(serializations, 1);
+      assert.equal(r.timers.size, 0);
+    });
+  }
+}
+
+test('delayed Rust delivery scripts cannot settle work or emit events in a replacement page', async () => {
+  const fixture = JSON.parse(await readFile(new URL('../crates/lumendesk/tests/session-delivery.json', import.meta.url), 'utf8'));
+  const r = makeRuntime({ session: 'replacement-page-session' });
+  const events = [];
+  r.window.lumen.on('changed', value => events.push(value));
+  const call = r.window.lumen.call('new_page_call', null);
+  const stream = r.window.lumen.stream('new_page_stream', null);
+  const read = stream.next();
+  let callSettled = false;
+  let readSettled = false;
+  call.then(() => { callSettled = true; });
+  read.then(() => { readSettled = true; });
+  for (const script of fixture.scripts) r.evaluate(script);
+  await Promise.resolve();
+  assert.equal(callSettled, false);
+  assert.equal(readSettled, false);
+  assert.deepEqual(events, []);
+  assert.equal(r.timers.size, 2);
+  r.respond(1, { Ok: 'new call' });
+  r.streamFrame({ id: 2, item: 'new item' });
+  completeStream(r, 2, 'new result');
+  r.emit('changed', 'new event');
+  assert.equal(await call, 'new call');
+  assert.deepEqual(normalized(await read), { done: false, value: 'new item' });
+  assert.equal(await stream.result, 'new result');
+  assert.deepEqual(events, ['new event']);
+  assert.equal(r.timers.size, 0);
+});
+
+test('Rust delivery scripts preserve JSON __proto__ keys as data for calls, streams and events', async () => {
+  const fixture = JSON.parse(await readFile(new URL('../crates/lumendesk/tests/session-delivery.json', import.meta.url), 'utf8'));
+  const r = makeRuntime({ session: fixture.session });
+  const events = [];
+  r.window.lumen.on('changed', value => events.push(value));
+  const call = r.window.lumen.call('json_call', null);
+  const stream = r.window.lumen.stream('json_stream', null);
+  const read = stream.next();
+  for (const script of fixture.scripts) r.evaluate(script);
+  completeStream(r, 2, null);
+  const values = [await call, (await read).value, events[0]];
+  await stream.result;
+  for (const value of values) {
+    assert.deepEqual(normalized(value), fixture.payload);
+    assert.equal(Object.prototype.hasOwnProperty.call(value, '__proto__'), true);
+    assert.equal(Object.prototype.hasOwnProperty.call(value.nested, '__proto__'), true);
+    assert.equal(value.trusted, undefined);
+    assert.equal(value.nested.role, undefined);
+  }
+  assert.equal(r.timers.size, 0);
+});
+
+for (const outerKind of ['call', 'stream']) {
+  for (const hook of ['listener', 'aborted getter']) {
+    test(`${outerKind} request IDs remain ordered when an abort ${hook} submits nested work`, async () => {
+      const r = makeRuntime();
+      const controller = new AbortController();
+      const signal = controller.signal;
+      let inner;
+      let serialized = false;
+      const submit = () => { if (!inner) inner = r.window.lumen.call('inner', null); };
+      if (hook === 'listener') {
+        const add = signal.addEventListener.bind(signal);
+        signal.addEventListener = (...args) => { submit(); return add(...args); };
+      } else {
+        Object.defineProperty(signal, 'aborted', {
+          get() { if (serialized) submit(); return false; },
+        });
+      }
+      const outer = r.window.lumen[outerKind]('outer', {
+        toJSON() { serialized = true; return 'outer payload'; },
+      }, signal);
+      const requests = r.outbound.map(frame => frame.request || frame.stream);
+      for (const frame of r.outbound.slice()) {
+        if (frame.request) r.respond(frame.request.id, { Ok: frame.request.method });
+        else completeStream(r, frame.stream.id, frame.stream.method);
+      }
+      assert.equal(await inner, 'inner');
+      assert.equal(await (outerKind === 'call' ? outer : outer.result), 'outer');
+      assert.deepEqual(requests.map(request => request.id), [1, 2]);
+      assert.equal(r.timers.size, 0);
+    });
+  }
+}
