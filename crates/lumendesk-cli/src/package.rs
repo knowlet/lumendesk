@@ -113,6 +113,12 @@ pub(crate) fn create(project: &Path, kind: Kind, output: &Path, offline: bool) -
         offline,
         (kind == Kind::Binary).then_some(host.as_str()),
     )?;
+    let workspace_root = Path::new(
+        metadata["workspace_root"]
+            .as_str()
+            .ok_or("missing workspace root")?,
+    );
+    let lockfile_path = workspace_root.join("Cargo.lock");
     let selected = selected_packages(&metadata, kind)?;
     let packages = &selected;
     let root_id = metadata["resolve"]["root"]
@@ -163,14 +169,10 @@ pub(crate) fn create(project: &Path, kind: Kind, output: &Path, offline: bool) -
     }
     let mut files = Files::new();
     if kind == Kind::Source {
+        let resolver = workspace_resolver(&metadata)?;
         files = app_files;
         // Cargo metadata creates/updates the application's resolution without executing build scripts.
-        add_file(
-            &mut files,
-            "Cargo.lock",
-            &project.join("Cargo.lock"),
-            MAX_SOURCE_FILE,
-        )?;
+        add_file(&mut files, "Cargo.lock", &lockfile_path, MAX_SOURCE_FILE)?;
         for package in packages.iter().filter(|p| p["source"].is_null()) {
             let manifest = checked_absolute(
                 Path::new(
@@ -188,8 +190,11 @@ pub(crate) fn create(project: &Path, kind: Kind, output: &Path, offline: bool) -
                 collect(directory, Path::new(""), prefix, &mut files)?;
                 // Workspace SDK crates inherit the repository's license texts.
                 let workspace = Path::new(metadata["workspace_root"].as_str().unwrap_or(""));
-                let sdk_workspace =
-                    find_workspace(directory).unwrap_or_else(|| workspace.to_path_buf());
+                // Repacked SDK crates live below _sdk without their old workspace
+                // manifest. Their assets still belong to _sdk, not the app root.
+                let sdk_workspace = bundled_sdk_root(directory)
+                    .or_else(|| find_workspace(directory))
+                    .unwrap_or_else(|| workspace.to_path_buf());
                 if sdk_workspace.join("assets").is_dir() {
                     collect(&sdk_workspace, Path::new("assets"), "_sdk/", &mut files)?;
                 }
@@ -205,7 +210,7 @@ pub(crate) fn create(project: &Path, kind: Kind, output: &Path, offline: bool) -
                     }
                 }
             }
-            let rewritten = rewrite_manifest(&manifest, package, prefix, &local)?;
+            let rewritten = rewrite_manifest(&manifest, package, prefix, &local, &resolver)?;
             insert(
                 &mut files,
                 &format!("{prefix}Cargo.toml"),
@@ -240,12 +245,8 @@ pub(crate) fn create(project: &Path, kind: Kind, output: &Path, offline: bool) -
         }
     }
     let lockfile: toml::Value = toml::from_str(
-        std::str::from_utf8(&read_regular_file(
-            &project.join("Cargo.lock"),
-            MAX_SOURCE_FILE,
-            false,
-        )?)
-        .map_err(|e| format!("invalid Cargo.lock: {e}"))?,
+        std::str::from_utf8(&read_regular_file(&lockfile_path, MAX_SOURCE_FILE, false)?)
+            .map_err(|e| format!("invalid Cargo.lock: {e}"))?,
     )
     .map_err(|e| format!("invalid Cargo.lock: {e}"))?;
     let dependencies = license_inventory(packages, root_id, &lockfile, &mut files)?;
@@ -771,6 +772,53 @@ fn portable_component_key(value: &str) -> String {
     value.nfc().flat_map(char::to_uppercase).nfc().collect()
 }
 
+// The known bundled layout is deliberately narrower than an arbitrary ancestor
+// containing an assets directory. collect() still validates all input paths.
+fn bundled_sdk_root(directory: &Path) -> Option<PathBuf> {
+    let crates = directory.parent()?;
+    let sdk = crates.parent()?;
+    (crates.file_name()? == "crates" && sdk.file_name()? == "_sdk").then(|| sdk.to_path_buf())
+}
+
+fn workspace_resolver(metadata: &Value) -> Result<String> {
+    let root = Path::new(
+        metadata["workspace_root"]
+            .as_str()
+            .ok_or("missing workspace root")?,
+    );
+    let bytes = read_regular_file(&root.join("Cargo.toml"), MAX_SOURCE_FILE, false)?;
+    let manifest: toml::Value =
+        toml::from_str(std::str::from_utf8(&bytes).map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+    if let Some(resolver) = manifest
+        .get("workspace")
+        .and_then(|v| v.get("resolver"))
+        .or_else(|| manifest.get("package").and_then(|v| v.get("resolver")))
+        .and_then(toml::Value::as_str)
+    {
+        return Ok(resolver.into());
+    }
+    // Cargo's metadata has already resolved inherited editions. A virtual
+    // workspace defaults to 1, irrespective of any selected member's edition.
+    let root_manifest = root.join("Cargo.toml");
+    let edition = metadata["packages"]
+        .as_array()
+        .ok_or("missing Cargo packages")?
+        .iter()
+        .find(|p| {
+            p["manifest_path"]
+                .as_str()
+                .is_some_and(|p| Path::new(p) == root_manifest)
+        })
+        .and_then(|p| p["edition"].as_str());
+    Ok(match edition {
+        Some("2024") => "3",
+        Some("2021") => "2",
+        _ => "1",
+    }
+    .into())
+}
+
 fn find_workspace(directory: &Path) -> Option<PathBuf> {
     directory
         .ancestors()
@@ -787,6 +835,7 @@ fn rewrite_manifest(
     package: &Value,
     prefix: &str,
     local: &BTreeMap<PathBuf, String>,
+    resolver: &str,
 ) -> Result<String> {
     let mut manifest: toml::Value =
         toml::from_str(&fs::read_to_string(path).map_err(|e| e.to_string())?)
@@ -822,6 +871,11 @@ fn rewrite_manifest(
         }
     }
     package_table.remove("workspace");
+    if prefix.is_empty() {
+        // The effective value is emitted in [workspace]; Cargo rejects having
+        // resolver in both the root package and workspace tables.
+        package_table.remove("resolver");
+    }
     let table = manifest.as_table_mut().ok_or("invalid Cargo manifest")?;
     if table.contains_key("patch") || table.contains_key("replace") {
         return Err("portable packaging does not support Cargo patch/replace overrides".into());
@@ -856,7 +910,7 @@ fn rewrite_manifest(
             workspace.insert("lints".into(), lints);
         }
         workspace.insert("exclude".into(), toml::Value::Array(members));
-        workspace.insert("resolver".into(), toml::Value::String("3".into()));
+        workspace.insert("resolver".into(), toml::Value::String(resolver.into()));
         table.insert("workspace".into(), toml::Value::Table(workspace));
     }
     rewrite_dependency_tables(

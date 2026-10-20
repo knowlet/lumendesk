@@ -159,6 +159,8 @@ fn source_rebuilds_after_original_app_and_sdk_are_removed() {
     fs::write(sdk.join("LICENSE-MIT"), "fixture SDK MIT notice").unwrap();
     fs::write(sdk.join("LICENSE-APACHE"), "fixture SDK Apache notice").unwrap();
     fs::write(sdk.join("assets/message.txt"), "bundled-sdk-asset").unwrap();
+    fs::create_dir(app.join("assets")).unwrap();
+    fs::write(app.join("assets/message.txt"), "separate-app-asset").unwrap();
     fs::write(sdk.join("crates/lumendesk/Cargo.toml"), "[package]\nname=\"lumendesk\"\nversion.workspace=true\nedition.workspace=true\nlicense.workspace=true\nrust-version.workspace=true\n[dependencies]\nlumendesk-core={path=\"../lumendesk-core\"}\n").unwrap();
     fs::write(sdk.join("crates/lumendesk/src/lib.rs"), "pub fn message() -> &'static str { let _ = lumendesk_core::NUMBER; include_str!(\"../../../assets/message.txt\") }\n").unwrap();
     fs::write(sdk.join("crates/lumendesk-core/Cargo.toml"), "[package]\nname=\"lumendesk-core\"\nversion.workspace=true\nedition.workspace=true\nlicense.workspace=true\nrust-version.workspace=true\n").unwrap();
@@ -200,6 +202,50 @@ fn source_rebuilds_after_original_app_and_sdk_are_removed() {
     let build = Command::new("cargo")
         .args(["run", "--release", "--offline", "--locked", "--quiet"])
         .current_dir(&extracted)
+        .output()
+        .unwrap();
+    assert!(build.status.success(), "{}", text(&build));
+    assert_eq!(
+        String::from_utf8_lossy(&build.stdout).trim(),
+        "bundled-sdk-asset"
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        let assets = extracted.join("_sdk/assets");
+        let saved = temp.join("saved-sdk-assets");
+        fs::rename(&assets, &saved).unwrap();
+        symlink(&saved, &assets).unwrap();
+        let rejected = temp.join("linked-assets.tar.gz");
+        let result = package(&extracted, &rejected, "source");
+        assert!(!result.status.success());
+        assert!(text(&result).contains("symlink"), "{}", text(&result));
+        assert!(!rejected.exists());
+        fs::remove_file(&assets).unwrap();
+        fs::rename(&saved, &assets).unwrap();
+    }
+    let repacked = temp.join("repacked.tar.gz");
+    let result = package(&extracted, &repacked, "source");
+    assert!(result.status.success(), "{}", text(&result));
+    let second = entries(&repacked);
+    verify_manifest(&second);
+    assert_eq!(
+        second.get("assets/message.txt"),
+        files.get("assets/message.txt")
+    );
+    assert_eq!(
+        second.get("_sdk/assets/message.txt"),
+        files.get("_sdk/assets/message.txt")
+    );
+    fs::remove_dir_all(&extracted).unwrap();
+    let relocated = temp.join("repacked-elsewhere");
+    fs::create_dir(&relocated).unwrap();
+    tar::Archive::new(GzDecoder::new(fs::File::open(&repacked).unwrap()))
+        .unpack(&relocated)
+        .unwrap();
+    let build = Command::new("cargo")
+        .args(["run", "--release", "--offline", "--locked", "--quiet"])
+        .current_dir(&relocated)
         .output()
         .unwrap();
     assert!(build.status.success(), "{}", text(&build));
@@ -604,4 +650,122 @@ fn real_web_source_archive_builds_and_retains_sdk_test_fixtures() {
     assert!(text(&result).contains(
         "webview::tests::delivery_scripts_bind_the_execution_to_the_original_page_session"
     ));
+}
+
+#[test]
+fn source_preserves_resolver_one_feature_unification() {
+    let temp = Temp::new();
+    let app = fixture(&temp);
+    let sdk = temp.join("lumendesk");
+    fs::create_dir_all(sdk.join("src")).unwrap();
+    fs::write(sdk.join("Cargo.toml"), "[package]\nname=\"lumendesk\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[features]\nneeded=[]\n").unwrap();
+    fs::write(
+        sdk.join("src/lib.rs"),
+        "#[cfg(feature = \"needed\")] pub fn needed() {}\n",
+    )
+    .unwrap();
+    let manifest = format!(
+        "[package]\nname=\"package-fixture\"\nversion=\"0.1.0\"\nedition=\"2024\"\n[workspace]\nresolver=\"1\"\n[dependencies]\nlumendesk={{path={:?}}}\n[dev-dependencies]\nlumendesk={{path={:?},features=[\"needed\"]}}\n",
+        sdk.to_str().unwrap(),
+        sdk.to_str().unwrap()
+    );
+    fs::write(app.join("Cargo.toml"), manifest).unwrap();
+    fs::write(
+        app.join("src/main.rs"),
+        "fn main() { lumendesk::needed(); }\n",
+    )
+    .unwrap();
+    let original = Command::new("cargo")
+        .args(["build", "--release", "--offline"])
+        .current_dir(&app)
+        .output()
+        .unwrap();
+    assert!(original.status.success(), "{}", text(&original));
+    let archive = temp.join("resolver.tar.gz");
+    let result = package(&app, &archive, "source");
+    assert!(result.status.success(), "{}", text(&result));
+    fs::remove_dir_all(&app).unwrap();
+    fs::remove_dir_all(&sdk).unwrap();
+    let relocated = temp.join("relocated");
+    fs::create_dir(&relocated).unwrap();
+    tar::Archive::new(GzDecoder::new(fs::File::open(&archive).unwrap()))
+        .unpack(&relocated)
+        .unwrap();
+    let build = Command::new("cargo")
+        .args(["build", "--release", "--offline", "--locked"])
+        .current_dir(&relocated)
+        .output()
+        .unwrap();
+    assert!(build.status.success(), "{}", text(&build));
+}
+
+#[test]
+fn source_preserves_effective_workspace_resolver() {
+    // Virtual roots ignore member editions. Nonvirtual roots, including a
+    // different root package, derive the default from their own edition.
+    for (workspace, member, expected) in [
+        (None, "edition=\"2018\"\n", "1"),
+        (None, "edition=\"2021\"\n", "2"),
+        (None, "edition=\"2024\"\n", "3"),
+        (None, "edition=\"2024\"\nresolver=\"1\"\n", "1"),
+        (
+            Some("[workspace]\nmembers=[\"app\"]\n"),
+            "edition=\"2024\"\n",
+            "1",
+        ),
+        (
+            Some("[workspace]\nmembers=[\"app\"]\nresolver=\"2\"\n"),
+            "edition=\"2024\"\n",
+            "2",
+        ),
+        (
+            Some(
+                "[package]\nname=\"lumendesk-core\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[workspace]\nmembers=[\"app\"]\n",
+            ),
+            "edition=\"2024\"\n",
+            "2",
+        ),
+        (
+            Some("[workspace]\nmembers=[\"app\"]\n[workspace.package]\nedition=\"2021\"\n"),
+            "edition.workspace=true\n",
+            "1",
+        ),
+    ] {
+        let temp = Temp::new();
+        let app = fixture(&temp);
+        let mut manifest =
+            format!("[package]\nname=\"package-fixture\"\nversion=\"1.2.3\"\n{member}");
+        if let Some(workspace) = workspace {
+            fs::write(temp.join("Cargo.toml"), workspace).unwrap();
+            if workspace.contains("[package]") {
+                fs::create_dir_all(temp.join("src")).unwrap();
+                fs::write(temp.join("src/lib.rs"), "").unwrap();
+            }
+        } else {
+            manifest.push_str("[workspace]\n");
+        }
+        fs::write(app.join("Cargo.toml"), manifest).unwrap();
+        let archive = temp.join("resolver.tar.gz");
+        let result = package(&app, &archive, "source");
+        assert!(result.status.success(), "{}", text(&result));
+        let files = entries(&archive);
+        let manifest: toml::Value =
+            toml::from_str(std::str::from_utf8(&files["Cargo.toml"]).unwrap()).unwrap();
+        assert_eq!(manifest["workspace"]["resolver"].as_str(), Some(expected));
+        let relocated = temp.join("relocated");
+        fs::create_dir(&relocated).unwrap();
+        tar::Archive::new(GzDecoder::new(fs::File::open(&archive).unwrap()))
+            .unpack(&relocated)
+            .unwrap();
+        let build = Command::new("cargo")
+            .args(["build", "--release", "--offline", "--locked"])
+            .current_dir(&relocated)
+            .output()
+            .unwrap();
+        assert!(
+            build.status.success(),
+            "resolver {expected}: {}",
+            text(&build)
+        );
+    }
 }
