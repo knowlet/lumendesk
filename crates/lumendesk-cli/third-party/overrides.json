@@ -1,0 +1,1051 @@
+{
+  "review_date": "2026-10-19",
+  "baseline_head": "a90f4c2d247c8b0cedd337ac911c12903f6faca8",
+  "scope": "31 empty notice entries in reproduced 275-dependency all-target web scaffold graph, plus one additional native font crate; not release clearance",
+  "registry_source": "registry+https://github.com/rust-lang/crates.io-index",
+  "entries": [
+    {
+      "name": "block2",
+      "version": "0.6.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MIT",
+      "archive_sha256": "cdeb9d870516001442e364c5220d3574d2da8dc765554b4a617230d33fa58ef5",
+      "source_archive_url": "https://static.crates.io/crates/block2/block2-0.6.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "b4167b582b2f75f9a1be75495c41b765344fd03c"
+        },
+        "path_in_vcs": "crates/block2"
+      },
+      "selected_license": "MIT (attribution review pending)",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/b4167b582b2f75f9a1be75495c41b765344fd03c/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-MIT-STANDARD.txt",
+          "file": "notices/LICENSE-MIT-STANDARD.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+          "url": "https://raw.githubusercontent.com/spdx/license-list-data/279b7e997a87c09be00dd6bdda189519ade502cf/text/MIT.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build.",
+        "Upstream supplies an MIT identifier/link without a complete copyright-specific notice. The included unmodified MIT standard text retains its placeholders; it does not invent an attribution or establish that the notice obligation is complete."
+      ]
+    },
+    {
+      "name": "cesu8",
+      "version": "1.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Apache-2.0/MIT",
+      "archive_sha256": "6d43a04d8753f35258c91f8ec639f792891f748a1edbd759cf1dcea3382ad83c",
+      "source_archive_url": "https://static.crates.io/crates/cesu8/cesu8-1.1.0.crate",
+      "upstream_vcs": null,
+      "selected_license": "Apache-2.0 (legacy slash expression clarified by published source headers)",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "archive_path": "NOTICE-ATTRIBUTION.txt",
+          "file": "notices/NOTICE-CESU8-ATTRIBUTION.txt",
+          "sha256": "da5982d30d3e4463f3fa74739eddace6ac4819bc6f2505bfbf588608f1daa65a",
+          "url": "https://static.crates.io/crates/cesu8/cesu8-1.1.0.crate"
+        }
+      ],
+      "remaining_review": []
+    },
+    {
+      "name": "dispatch2",
+      "version": "0.3.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "1e0e367e4e7da84520dedcac1901e4da967309406d1e51017ae1abfb97adbd38",
+      "source_archive_url": "https://static.crates.io/crates/dispatch2/dispatch2-0.3.1.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "8852b424193ca41602281b3d7540d7c8ed51e49a"
+        },
+        "path_in_vcs": "crates/dispatch2"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/8852b424193ca41602281b3d7540d7c8ed51e49a/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "dlopen2",
+      "version": "0.8.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MIT",
+      "archive_sha256": "5e2c5bd4158e66d1e215c49b837e11d62f3267b30c92f1d171c4d3105e3dc4d4",
+      "source_archive_url": "https://static.crates.io/crates/dlopen2/dlopen2-0.8.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "cc80e4a0a90d499b677fdf7743699b4b3a43a989"
+        },
+        "path_in_vcs": "dlopen2"
+      },
+      "selected_license": "MIT",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-MIT.txt",
+          "file": "notices/LICENSE-DLOPEN2-MIT.txt",
+          "sha256": "39fa265207450e77c62e90c5594a06c085b655d8374c7ced4bf7894b6bd95dd2",
+          "url": "https://raw.githubusercontent.com/OpenByteDev/dlopen2/cc80e4a0a90d499b677fdf7743699b4b3a43a989/LICENSE"
+        }
+      ],
+      "remaining_review": []
+    },
+    {
+      "name": "dlopen2_derive",
+      "version": "0.4.3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MIT",
+      "archive_sha256": "0fbbb781877580993a8707ec48672673ec7b81eeba04cfd2310bd28c08e47c8f",
+      "source_archive_url": "https://static.crates.io/crates/dlopen2_derive/dlopen2_derive-0.4.3.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "cc80e4a0a90d499b677fdf7743699b4b3a43a989"
+        },
+        "path_in_vcs": "dlopen2-derive"
+      },
+      "selected_license": "MIT",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-MIT.txt",
+          "file": "notices/LICENSE-DLOPEN2-MIT.txt",
+          "sha256": "39fa265207450e77c62e90c5594a06c085b655d8374c7ced4bf7894b6bd95dd2",
+          "url": "https://raw.githubusercontent.com/OpenByteDev/dlopen2/cc80e4a0a90d499b677fdf7743699b4b3a43a989/LICENSE"
+        }
+      ],
+      "remaining_review": []
+    },
+    {
+      "name": "jni-sys-macros",
+      "version": "0.4.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MIT OR Apache-2.0",
+      "archive_sha256": "38c0b942f458fe50cdac086d2f946512305e5631e720728f2a61aabcd47a6264",
+      "source_archive_url": "https://static.crates.io/crates/jni-sys-macros/jni-sys-macros-0.4.1.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "64d77b7a5f119d7b55b4e2c169a4668067ff59e6"
+        },
+        "path_in_vcs": "jni-sys-macros"
+      },
+      "selected_license": "MIT; both upstream alternative texts retained",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-MIT.txt",
+          "file": "notices/JNI-SYS-LICENSE-MIT.txt",
+          "sha256": "1d85bd754b04ceec93e98e890edd1fa3c6a22e81bcb32135806beeccefa51cd1",
+          "url": "https://raw.githubusercontent.com/jni-rs/jni-sys/64d77b7a5f119d7b55b4e2c169a4668067ff59e6/LICENSE-MIT"
+        },
+        {
+          "archive_path": "LICENSE-APACHE.txt",
+          "file": "notices/JNI-SYS-LICENSE-APACHE.txt",
+          "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
+          "url": "https://raw.githubusercontent.com/jni-rs/jni-sys/64d77b7a5f119d7b55b4e2c169a4668067ff59e6/LICENSE-APACHE"
+        }
+      ],
+      "remaining_review": []
+    },
+    {
+      "name": "ndk",
+      "version": "0.9.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MIT OR Apache-2.0",
+      "archive_sha256": "c3f42e7bbe13d351b6bead8286a43aac9534b82bd3cc43e47037f012ebfd62d4",
+      "source_archive_url": "https://static.crates.io/crates/ndk/ndk-0.9.0.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "49bbbba16c58ff63cb8a0ad0eca5a9fb7ecaec25"
+        },
+        "path_in_vcs": "ndk"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-APACHE.txt",
+          "file": "notices/NDK-LICENSE-APACHE.txt",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "url": "https://raw.githubusercontent.com/rust-mobile/ndk/49bbbba16c58ff63cb8a0ad0eca5a9fb7ecaec25/LICENSE-APACHE"
+        }
+      ],
+      "remaining_review": []
+    },
+    {
+      "name": "ndk-sys",
+      "version": "0.6.0+11769913",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MIT OR Apache-2.0",
+      "archive_sha256": "ee6cda3051665f1fb8d9e08fc35c96d5a244fb1be711a03b71118828afc9a873",
+      "source_archive_url": "https://static.crates.io/crates/ndk-sys/ndk-sys-0.6.0+11769913.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "49bbbba16c58ff63cb8a0ad0eca5a9fb7ecaec25"
+        },
+        "path_in_vcs": "ndk-sys"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-APACHE.txt",
+          "file": "notices/NDK-LICENSE-APACHE.txt",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "url": "https://raw.githubusercontent.com/rust-mobile/ndk/49bbbba16c58ff63cb8a0ad0eca5a9fb7ecaec25/LICENSE-APACHE"
+        }
+      ],
+      "remaining_review": []
+    },
+    {
+      "name": "objc2",
+      "version": "0.6.5",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MIT",
+      "archive_sha256": "08849bbd4767dfae9457696856ae1c84fe4e0281bbe4a7abff2d0e06fb7981f8",
+      "source_archive_url": "https://static.crates.io/crates/objc2/objc2-0.6.5.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "d7d2fa23ceaa5e6096c923b081040e5d81b3b9df"
+        },
+        "path_in_vcs": "crates/objc2"
+      },
+      "selected_license": "MIT (attribution review pending)",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/d7d2fa23ceaa5e6096c923b081040e5d81b3b9df/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-MIT-STANDARD.txt",
+          "file": "notices/LICENSE-MIT-STANDARD.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+          "url": "https://raw.githubusercontent.com/spdx/license-list-data/279b7e997a87c09be00dd6bdda189519ade502cf/text/MIT.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build.",
+        "Upstream supplies an MIT identifier/link without a complete copyright-specific notice. The included unmodified MIT standard text retains its placeholders; it does not invent an attribution or establish that the notice obligation is complete."
+      ]
+    },
+    {
+      "name": "objc2-app-kit",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "d49e936b501e5c5bf01fda3a9452ff86dc3ea98ad5f283e1455153142d97518c",
+      "source_archive_url": "https://static.crates.io/crates/objc2-app-kit/objc2-app-kit-0.3.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+        },
+        "path_in_vcs": "framework-crates/objc2-app-kit"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-cloud-kit",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "73ad74d880bb43877038da939b7427bba67e9dd42004a18b809ba7d87cee241c",
+      "source_archive_url": "https://static.crates.io/crates/objc2-cloud-kit/objc2-cloud-kit-0.3.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+        },
+        "path_in_vcs": "framework-crates/objc2-cloud-kit"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-core-data",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "0b402a653efbb5e82ce4df10683b6b28027616a2715e90009947d50b8dd298fa",
+      "source_archive_url": "https://static.crates.io/crates/objc2-core-data/objc2-core-data-0.3.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+        },
+        "path_in_vcs": "framework-crates/objc2-core-data"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-core-foundation",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "2a180dd8642fa45cdb7dd721cd4c11b1cadd4929ce112ebd8b9f5803cc79d536",
+      "source_archive_url": "https://static.crates.io/crates/objc2-core-foundation/objc2-core-foundation-0.3.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+        },
+        "path_in_vcs": "framework-crates/objc2-core-foundation"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-core-graphics",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "e022c9d066895efa1345f8e33e584b9f958da2fd4cd116792e15e07e4720a807",
+      "source_archive_url": "https://static.crates.io/crates/objc2-core-graphics/objc2-core-graphics-0.3.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+        },
+        "path_in_vcs": "framework-crates/objc2-core-graphics"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-core-image",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "e5d563b38d2b97209f8e861173de434bd0214cf020e3423a52624cd1d989f006",
+      "source_archive_url": "https://static.crates.io/crates/objc2-core-image/objc2-core-image-0.3.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+        },
+        "path_in_vcs": "framework-crates/objc2-core-image"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-core-location",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "ca347214e24bc973fc025fd0d36ebb179ff30536ed1f80252706db19ee452009",
+      "source_archive_url": "https://static.crates.io/crates/objc2-core-location/objc2-core-location-0.3.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+        },
+        "path_in_vcs": "framework-crates/objc2-core-location"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-core-text",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "0cde0dfb48d25d2b4862161a4d5fcc0e3c24367869ad306b0c9ec0073bfed92d",
+      "source_archive_url": "https://static.crates.io/crates/objc2-core-text/objc2-core-text-0.3.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+        },
+        "path_in_vcs": "framework-crates/objc2-core-text"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-encode",
+      "version": "4.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MIT",
+      "archive_sha256": "ef25abbcd74fb2609453eb695bd2f860d389e457f67dc17cafc8b8cbc89d0c33",
+      "source_archive_url": "https://static.crates.io/crates/objc2-encode/objc2-encode-4.1.0.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "8d214f5477365ffcbcbb7de058c86ed9a518efb7"
+        },
+        "path_in_vcs": "crates/objc2-encode"
+      },
+      "selected_license": "MIT (attribution review pending)",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/8d214f5477365ffcbcbb7de058c86ed9a518efb7/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-MIT-STANDARD.txt",
+          "file": "notices/LICENSE-MIT-STANDARD.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+          "url": "https://raw.githubusercontent.com/spdx/license-list-data/279b7e997a87c09be00dd6bdda189519ade502cf/text/MIT.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build.",
+        "Upstream supplies an MIT identifier/link without a complete copyright-specific notice. The included unmodified MIT standard text retains its placeholders; it does not invent an attribution or establish that the notice obligation is complete."
+      ]
+    },
+    {
+      "name": "objc2-exception-helper",
+      "version": "0.1.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "c7a1c5fbb72d7735b076bb47b578523aedc40f3c439bea6dfd595c089d79d98a",
+      "source_archive_url": "https://static.crates.io/crates/objc2-exception-helper/objc2-exception-helper-0.1.1.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "8d214f5477365ffcbcbb7de058c86ed9a518efb7"
+        },
+        "path_in_vcs": "crates/objc2-exception-helper"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/8d214f5477365ffcbcbb7de058c86ed9a518efb7/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-foundation",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MIT",
+      "archive_sha256": "e3e0adef53c21f888deb4fa59fc59f7eb17404926ee8a6f59f5df0fd7f9f3272",
+      "source_archive_url": "https://static.crates.io/crates/objc2-foundation/objc2-foundation-0.3.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+        },
+        "path_in_vcs": "framework-crates/objc2-foundation"
+      },
+      "selected_license": "MIT (attribution review pending)",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-MIT-STANDARD.txt",
+          "file": "notices/LICENSE-MIT-STANDARD.txt",
+          "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+          "url": "https://raw.githubusercontent.com/spdx/license-list-data/279b7e997a87c09be00dd6bdda189519ade502cf/text/MIT.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build.",
+        "Upstream supplies an MIT identifier/link without a complete copyright-specific notice. The included unmodified MIT standard text retains its placeholders; it does not invent an attribution or establish that the notice obligation is complete."
+      ]
+    },
+    {
+      "name": "objc2-io-surface",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "180788110936d59bab6bd83b6060ffdfffb3b922ba1396b312ae795e1de9d81d",
+      "source_archive_url": "https://static.crates.io/crates/objc2-io-surface/objc2-io-surface-0.3.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+        },
+        "path_in_vcs": "framework-crates/objc2-io-surface"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-quartz-core",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "96c1358452b371bf9f104e21ec536d37a650eb10f7ee379fff67d2e08d537f1f",
+      "source_archive_url": "https://static.crates.io/crates/objc2-quartz-core/objc2-quartz-core-0.3.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+        },
+        "path_in_vcs": "framework-crates/objc2-quartz-core"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-ui-kit",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "d87d638e33c06f577498cbcc50491496a3ed4246998a7fbba7ccb98b1e7eab22",
+      "source_archive_url": "https://static.crates.io/crates/objc2-ui-kit/objc2-ui-kit-0.3.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+        },
+        "path_in_vcs": "framework-crates/objc2-ui-kit"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-user-notifications",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "9df9128cbbfef73cda168416ccf7f837b62737d748333bfe9ab71c245d76613e",
+      "source_archive_url": "https://static.crates.io/crates/objc2-user-notifications/objc2-user-notifications-0.3.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+        },
+        "path_in_vcs": "framework-crates/objc2-user-notifications"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-web-kit",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "Zlib OR Apache-2.0 OR MIT",
+      "archive_sha256": "b2e5aaab980c433cf470df9d7af96a7b46a9d892d521a2cbbb2f8a4c16751e7f",
+      "source_archive_url": "https://static.crates.io/crates/objc2-web-kit/objc2-web-kit-0.3.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
+        },
+        "path_in_vcs": "framework-crates/objc2-web-kit"
+      },
+      "selected_license": "Apache-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-UPSTREAM.md",
+          "file": "notices/LICENSE-OBJC2-UPSTREAM.md",
+          "sha256": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54",
+          "url": "https://raw.githubusercontent.com/madsmtm/objc2/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md"
+        },
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        }
+      ],
+      "remaining_review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "selectors",
+      "version": "0.38.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MPL-2.0",
+      "archive_sha256": "8adfa1c298912827b8a28b223b3b874357397ae706e6190acd9bf28cee99114d",
+      "source_archive_url": "https://static.crates.io/crates/selectors/selectors-0.38.0.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "572ecba2d1600e7c3d490586692a209faf703baa"
+        },
+        "path_in_vcs": "selectors"
+      },
+      "selected_license": "MPL-2.0",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-MPL-2.0.txt",
+          "file": "notices/LICENSE-MPL-2.0.txt",
+          "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
+          "url": "https://www.mozilla.org/MPL/2.0/index.txt"
+        }
+      ],
+      "remaining_review": []
+    },
+    {
+      "name": "webview2-com",
+      "version": "0.39.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MIT",
+      "archive_sha256": "3f89fca7a704cee10dcb3654c1dbb8941d1783132f1917358af75bec37a7d7e6",
+      "source_archive_url": "https://static.crates.io/crates/webview2-com/webview2-com-0.39.1.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "edc2caf886175ccaebe86078c9cfe1ae2a187328"
+        },
+        "path_in_vcs": "crates/webview2-com"
+      },
+      "selected_license": "MIT (Rust bindings)",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-RUST-MIT.txt",
+          "file": "notices/LICENSE-WEBVIEW2-RUST-MIT.txt",
+          "sha256": "0dcf41516e608bbcb6cdc5229feb7b86fe4a643b85e7df251133c93408fdac73",
+          "url": "https://raw.githubusercontent.com/wravery/webview2-rs/edc2caf886175ccaebe86078c9cfe1ae2a187328/LICENSE"
+        }
+      ],
+      "remaining_review": []
+    },
+    {
+      "name": "webview2-com-macros",
+      "version": "0.8.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MIT",
+      "archive_sha256": "67a921c1b6914c367b2b823cd4cde6f96beec77d30a939c8199bb377cf9b9b54",
+      "source_archive_url": "https://static.crates.io/crates/webview2-com-macros/webview2-com-macros-0.8.1.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "dffa41a8a46d3f5565eefbff2de57d38d399f158"
+        },
+        "path_in_vcs": "crates/callback-macros"
+      },
+      "selected_license": "MIT (Rust bindings)",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-RUST-MIT.txt",
+          "file": "notices/LICENSE-WEBVIEW2-RUST-MIT.txt",
+          "sha256": "0dcf41516e608bbcb6cdc5229feb7b86fe4a643b85e7df251133c93408fdac73",
+          "url": "https://raw.githubusercontent.com/wravery/webview2-rs/dffa41a8a46d3f5565eefbff2de57d38d399f158/LICENSE"
+        }
+      ],
+      "remaining_review": []
+    },
+    {
+      "name": "webview2-com-sys",
+      "version": "0.39.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MIT",
+      "archive_sha256": "b3a07132775117d6065853d9d1178157b8c90e228de47129d6bce2c7edebedfb",
+      "source_archive_url": "https://static.crates.io/crates/webview2-com-sys/webview2-com-sys-0.39.1.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "edc2caf886175ccaebe86078c9cfe1ae2a187328"
+        },
+        "path_in_vcs": "crates/bindings"
+      },
+      "selected_license": "MIT (Rust bindings); Microsoft SDK BSD-3-Clause and preserved NOTICE",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-RUST-MIT.txt",
+          "file": "notices/LICENSE-WEBVIEW2-RUST-MIT.txt",
+          "sha256": "0dcf41516e608bbcb6cdc5229feb7b86fe4a643b85e7df251133c93408fdac73",
+          "url": "https://raw.githubusercontent.com/wravery/webview2-rs/edc2caf886175ccaebe86078c9cfe1ae2a187328/LICENSE"
+        },
+        {
+          "archive_path": "MICROSOFT-SDK-LICENSE.txt",
+          "file": "notices/MICROSOFT-WEBVIEW2-SDK-LICENSE.txt",
+          "sha256": "0af8f1b807512aae39c2ac1aa4d0cae65cabecb6fd554b8439a5162a0d6eca55",
+          "url": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.3800.47/microsoft.web.webview2.1.0.3800.47.nupkg#LICENSE.txt"
+        },
+        {
+          "archive_path": "MICROSOFT-SDK-NOTICE.txt",
+          "file": "notices/MICROSOFT-WEBVIEW2-SDK-NOTICE.txt",
+          "sha256": "106423785c5b7eba0a8e61d1837f2132e9c828e20ad530f565d981c1df60dd90",
+          "url": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.3800.47/microsoft.web.webview2.1.0.3800.47.nupkg#NOTICE.txt"
+        }
+      ],
+      "remaining_review": [],
+      "bundled_component": {
+        "name": "Microsoft.Web.WebView2 SDK loader",
+        "version": "1.0.3800.47",
+        "license": "BSD-3-Clause with included third-party notices",
+        "archive_url": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.3800.47/microsoft.web.webview2.1.0.3800.47.nupkg",
+        "archive_sha256": "56c9f26bdd07916a2d1949fb58a5c7e434dfa1173577dca879206050c4e718db",
+        "verification": "All 9 loader files (arm64/x64/x86; DLL, DLL import library, static library) compared byte-for-byte against the crate and official SDK archive."
+      }
+    },
+    {
+      "name": "winapi-i686-pc-windows-gnu",
+      "version": "0.4.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MIT/Apache-2.0",
+      "archive_sha256": "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6",
+      "source_archive_url": "https://static.crates.io/crates/winapi-i686-pc-windows-gnu/winapi-i686-pc-windows-gnu-0.4.0.crate",
+      "upstream_vcs": null,
+      "selected_license": "Apache-2.0 (legacy slash expression clarified by published source headers)",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "archive_path": "NOTICE-ATTRIBUTION.txt",
+          "file": "notices/NOTICE-WINAPI-IMPORT-ATTRIBUTION.txt",
+          "sha256": "39b26069ebfd06bd584d6c73f6f75151dcb2ec5dfa5b097e3dd784e888cb10f8",
+          "url": "https://static.crates.io/crates/winapi-i686-pc-windows-gnu/winapi-i686-pc-windows-gnu-0.4.0.crate"
+        }
+      ],
+      "remaining_review": []
+    },
+    {
+      "name": "winapi-x86_64-pc-windows-gnu",
+      "version": "0.4.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "MIT/Apache-2.0",
+      "archive_sha256": "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f",
+      "source_archive_url": "https://static.crates.io/crates/winapi-x86_64-pc-windows-gnu/winapi-x86_64-pc-windows-gnu-0.4.0.crate",
+      "upstream_vcs": null,
+      "selected_license": "Apache-2.0 (legacy slash expression clarified by published source headers)",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-APACHE-2.0.txt",
+          "file": "notices/LICENSE-APACHE-2.0.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "archive_path": "NOTICE-ATTRIBUTION.txt",
+          "file": "notices/NOTICE-WINAPI-IMPORT-ATTRIBUTION.txt",
+          "sha256": "39b26069ebfd06bd584d6c73f6f75151dcb2ec5dfa5b097e3dd784e888cb10f8",
+          "url": "https://static.crates.io/crates/winapi-x86_64-pc-windows-gnu/winapi-x86_64-pc-windows-gnu-0.4.0.crate"
+        }
+      ],
+      "remaining_review": []
+    },
+    {
+      "name": "epaint_default_fonts",
+      "version": "0.36.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "declared_license": "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0",
+      "archive_sha256": "773fa9c96dd0dbef887e39d0ed6177f141cce4d68e6041df77570aa3702dfa13",
+      "source_archive_url": "https://static.crates.io/crates/epaint_default_fonts/epaint_default_fonts-0.36.2.crate",
+      "upstream_vcs": {
+        "git": {
+          "sha1": "49682f8baa058bf49e011035cfbd6e825f88a5ef"
+        },
+        "path_in_vcs": "crates/epaint_default_fonts"
+      },
+      "selected_license": "MIT for crate code; all included font-specific terms (including Bitstream Vera) retained",
+      "notice_files": [
+        {
+          "archive_path": "LICENSE-MIT.txt",
+          "file": "notices/EGUI-LICENSE-MIT.txt",
+          "sha256": "95ca92f5f8ea5231f1580b3a2a799e8260af3114b900e1def5355a7f44bcf60c",
+          "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-MIT"
+        },
+        {
+          "archive_path": "LICENSE-APACHE.txt",
+          "file": "notices/EGUI-LICENSE-APACHE.txt",
+          "sha256": "8173d5c29b4f956d532781d2b86e4e30f83e6b7878dce18c919451d6ba707c90",
+          "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-APACHE"
+        },
+        {
+          "archive_path": "fonts/OFL.txt",
+          "file": "notices/EPAINT-OFL.txt",
+          "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+          "url": "https://static.crates.io/crates/epaint_default_fonts/epaint_default_fonts-0.36.2.crate#fonts/OFL.txt"
+        },
+        {
+          "archive_path": "fonts/UFL.txt",
+          "file": "notices/EPAINT-UFL.txt",
+          "sha256": "2f0015108d68627bd788d313f529c21ff4da2c2c42a5e1f3883acc83480f9002",
+          "url": "https://static.crates.io/crates/epaint_default_fonts/epaint_default_fonts-0.36.2.crate#fonts/UFL.txt"
+        },
+        {
+          "archive_path": "fonts/emoji-icon-font-mit-license.txt",
+          "file": "notices/EPAINT-emoji-icon-font-mit-license.txt",
+          "sha256": "b9d2c1d909aa149996fd4c91dcb92b2362a04431640c1d200959da94caf8cde1",
+          "url": "https://static.crates.io/crates/epaint_default_fonts/epaint_default_fonts-0.36.2.crate#fonts/emoji-icon-font-mit-license.txt"
+        },
+        {
+          "archive_path": "fonts/Hack-Regular.txt",
+          "file": "notices/EPAINT-Hack-Regular.txt",
+          "sha256": "47c0cccbeec7e8614548cc485588b28149e7874188df5f41b36efebcee285c87",
+          "url": "https://static.crates.io/crates/epaint_default_fonts/epaint_default_fonts-0.36.2.crate#fonts/Hack-Regular.txt"
+        },
+        {
+          "archive_path": "fonts/NOTICE-FONT-ATTRIBUTION.txt",
+          "file": "notices/NOTICE-EPAINT-FONT-ATTRIBUTION.txt",
+          "sha256": "792ffffc7d2d512112287bfff9fa036efb6f1f11c544de99754c5b8b163b21eb",
+          "url": "https://static.crates.io/crates/epaint_default_fonts/epaint_default_fonts-0.36.2.crate"
+        }
+      ],
+      "remaining_review": [],
+      "scope": "Additional native-only finding, outside the historical web 275/31 graph",
+      "bundled_fonts": [
+        {
+          "path": "fonts/Hack-Regular.ttf",
+          "sha256": "15f55cc0c85a2988d2b4b3a8cdb5d77fdfbaf319e1bb5309d725db9818fb7125",
+          "name_records": [
+            [
+              0,
+              "Copyright (c) 2018 Source Foundry Authors / Copyright (c) 2003 by Bitstream, Inc. All Rights Reserved."
+            ],
+            [
+              13,
+              "The work in the Hack project is Copyright 2018 Source Foundry Authors and licensed under the MIT License\n\nThe work in the DejaVu project was committed to the public domain.\n\nBitstream Vera Sans Mono Copyright 2003 Bitstream Inc. and licensed under the Bitstream Vera License with Reserved Font Names \"Bitstream\" and \"Vera\"\n\nMIT License\n\nCopyright (c) 2018 Source Foundry Authors\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n\nBITSTREAM VERA LICENSE\n\nCopyright (c) 2003 by Bitstream, Inc. All Rights Reserved. Bitstream Vera is a trademark of Bitstream, Inc.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of the fonts accompanying this license (\"Fonts\") and associated documentation files (the \"Font Software\"), to reproduce and distribute the Font Software, including without limitation the rights to use, copy, merge, publish, distribute, and/or sell copies of the Font Software, and to permit persons to whom the Font Software is furnished to do so, subject to the following conditions:\n\nThe above copyright and trademark notices and this permission notice shall be included in all copies of one or more of the Font Software typefaces.\n\nThe Font Software may be modified, altered, or added to, and in particular the designs of glyphs or characters in the Fonts may be modified and additional glyphs or characters may be added to the Fonts, only if the fonts are renamed to names not containing either the words \"Bitstream\" or the word \"Vera\".\n\nThis License becomes null and void to the extent applicable to Fonts or Font Software that has been modified and is distributed under the \"Bitstream Vera\" names.\n\nThe Font Software may be sold as part of a larger software package but no copy of one or more of the Font Software typefaces may be sold by itself.\n\nTHE FONT SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL BITSTREAM OR THE GNOME FOUNDATION BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM OTHER DEALINGS IN THE FONT SOFTWARE.\n\nExcept as contained in this notice, the names of Gnome, the Gnome Foundation, and Bitstream Inc., shall not be used in advertising or otherwise to promote the sale, use or other dealings in this Font Software without prior written authorization from the Gnome Foundation or Bitstream Inc., respectively. For further information, contact: fonts at gnome dot org."
+            ],
+            [
+              14,
+              "https://github.com/source-foundry/Hack/blob/master/LICENSE.md"
+            ]
+          ]
+        },
+        {
+          "path": "fonts/NotoEmoji-Regular.ttf",
+          "sha256": "415dc6290378574135b64c808dc640c1df7531973290c4970c51fdeb849cb0c5",
+          "name_records": [
+            [
+              0,
+              "Copyright 2013 Google Inc. All Rights Reserved."
+            ],
+            [
+              13,
+              "This Font Software is licensed under the SIL Open Font License, Version 1.1. This Font Software is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the SIL Open Font License for the specific language, permissions and limitations governing your use of this Font Software."
+            ],
+            [
+              14,
+              "http://scripts.sil.org/OFL"
+            ]
+          ]
+        },
+        {
+          "path": "fonts/Ubuntu-Light.ttf",
+          "sha256": "80307b8da7649aa4ee4d484b232140e3ce1ec0ca093073d3c53c8f5a5ced7a70",
+          "name_records": [
+            [
+              0,
+              "Copyright 2011 Canonical Ltd.  Licensed under the Ubuntu Font Licence 1.0"
+            ]
+          ]
+        },
+        {
+          "path": "fonts/emoji-icon-font.ttf",
+          "sha256": "f426bec371f484646d002717e2c555a95cd5145e635d83a48bbef83f3abf18ca",
+          "name_records": []
+        }
+      ]
+    }
+  ]
+}

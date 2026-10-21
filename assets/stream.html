@@ -1,0 +1,21 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>One step at a time</title><link rel="stylesheet" href="/style.css"></head><body><main>
+<p class="eyebrow">LUMENDESK / BOUNDED STREAMS</p><h1>One step at a time.</h1><p class="intro">Each read grants one item of credit. Cancel stops the Rust producer.</p>
+<button id="start" disabled>Stream 36 steps</button> <button id="cancel" disabled>Cancel</button><pre id="progress" aria-live="polite">Connecting…</pre>
+<script>
+let controller;
+function ready(){
+  const start=document.getElementById('start'),cancel=document.getElementById('cancel'),progress=document.getElementById('progress');
+  start.disabled=false;progress.textContent='Ready.';
+  cancel.onclick=()=>controller?.abort();
+  start.onclick=async()=>{
+    controller=new AbortController();start.disabled=true;cancel.disabled=false;progress.textContent='';
+    try {
+      const stream=window.lumen.stream('progress',{count:36},controller.signal);
+      for await(const step of stream){progress.textContent=step.label;}
+      progress.textContent=`Complete: ${await stream.result} ordered steps.`;
+    }catch(error){progress.textContent=`Stopped: ${error.message}`;}
+    finally{start.disabled=false;cancel.disabled=true;controller=null;}
+  };
+}
+if(window.lumen)ready();else window.addEventListener('lumendesk-ready',ready,{once:true});
+</script></main></body></html>

@@ -1,0 +1,276 @@
+{
+  "inspection_date": "2026-10-19",
+  "artifact_label": "additional native source graph, outside historical web275/31 scope",
+  "archive_sha256": "57edbfb53fae844a49fe63d00f606322d54477a2acc11481f7da76fe537c0325",
+  "archive_bytes": 307328,
+  "dependencies": 395,
+  "registry_sources_vendored": false,
+  "dependencies_without_notices": [
+    {
+      "name": "accesskit",
+      "version": "0.24.1",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "accesskit_atspi_common",
+      "version": "0.18.1",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "accesskit_consumer",
+      "version": "0.35.0",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "accesskit_consumer",
+      "version": "0.36.0",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "accesskit_consumer",
+      "version": "0.38.0",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "accesskit_macos",
+      "version": "0.26.3",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "accesskit_unix",
+      "version": "0.21.1",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "accesskit_windows",
+      "version": "0.32.1",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "accesskit_winit",
+      "version": "0.32.2",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "block2",
+      "version": "0.5.1",
+      "license": "MIT"
+    },
+    {
+      "name": "clipboard-win",
+      "version": "5.4.1",
+      "license": "BSL-1.0"
+    },
+    {
+      "name": "dispatch",
+      "version": "0.2.0",
+      "license": "MIT"
+    },
+    {
+      "name": "ecolor",
+      "version": "0.36.2",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "eframe",
+      "version": "0.36.2",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "egui",
+      "version": "0.36.2",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "egui-wgpu",
+      "version": "0.36.2",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "egui-winit",
+      "version": "0.36.2",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "egui_glow",
+      "version": "0.36.2",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "emath",
+      "version": "0.36.2",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "epaint",
+      "version": "0.36.2",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "gl_generator",
+      "version": "0.14.0",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "jni",
+      "version": "0.22.4",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "jni-macros",
+      "version": "0.22.4",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "khronos_api",
+      "version": "3.1.0",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "ndk-context",
+      "version": "0.1.1",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "name": "objc-sys",
+      "version": "0.3.5",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2",
+      "version": "0.5.3",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2-app-kit",
+      "version": "0.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2-cloud-kit",
+      "version": "0.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2-contacts",
+      "version": "0.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2-core-data",
+      "version": "0.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2-core-image",
+      "version": "0.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2-core-location",
+      "version": "0.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2-foundation",
+      "version": "0.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2-link-presentation",
+      "version": "0.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2-metal",
+      "version": "0.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2-quartz-core",
+      "version": "0.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2-symbols",
+      "version": "0.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2-ui-kit",
+      "version": "0.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2-uniform-type-identifiers",
+      "version": "0.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "objc2-user-notifications",
+      "version": "0.2.2",
+      "license": "MIT"
+    },
+    {
+      "name": "profiling",
+      "version": "1.0.18",
+      "license": "MIT OR Apache-2.0"
+    }
+  ],
+  "epaint_default_fonts": {
+    "name": "epaint_default_fonts",
+    "version": "0.36.2",
+    "source": "registry+https://github.com/rust-lang/crates.io-index",
+    "license": "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0",
+    "notices": [
+      "dependency-licenses/epaint_default_fonts-0.36.2/curated/LICENSE-APACHE.txt",
+      "dependency-licenses/epaint_default_fonts-0.36.2/curated/LICENSE-MIT.txt",
+      "dependency-licenses/epaint_default_fonts-0.36.2/curated/fonts/Hack-Regular.txt",
+      "dependency-licenses/epaint_default_fonts-0.36.2/curated/fonts/NOTICE-FONT-ATTRIBUTION.txt",
+      "dependency-licenses/epaint_default_fonts-0.36.2/curated/fonts/OFL.txt",
+      "dependency-licenses/epaint_default_fonts-0.36.2/curated/fonts/UFL.txt",
+      "dependency-licenses/epaint_default_fonts-0.36.2/curated/fonts/emoji-icon-font-mit-license.txt"
+    ],
+    "source_archive": {
+      "url": "https://static.crates.io/crates/epaint_default_fonts/epaint_default_fonts-0.36.2.crate",
+      "sha256": "773fa9c96dd0dbef887e39d0ed6177f141cce4d68e6041df77570aa3702dfa13",
+      "local_source_verified": true
+    },
+    "notice_provenance": [
+      {
+        "path": "dependency-licenses/epaint_default_fonts-0.36.2/curated/LICENSE-MIT.txt",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-MIT"
+      },
+      {
+        "path": "dependency-licenses/epaint_default_fonts-0.36.2/curated/LICENSE-APACHE.txt",
+        "url": "https://raw.githubusercontent.com/emilk/egui/49682f8baa058bf49e011035cfbd6e825f88a5ef/LICENSE-APACHE"
+      },
+      {
+        "path": "dependency-licenses/epaint_default_fonts-0.36.2/curated/fonts/OFL.txt",
+        "url": "https://static.crates.io/crates/epaint_default_fonts/epaint_default_fonts-0.36.2.crate#fonts/OFL.txt"
+      },
+      {
+        "path": "dependency-licenses/epaint_default_fonts-0.36.2/curated/fonts/UFL.txt",
+        "url": "https://static.crates.io/crates/epaint_default_fonts/epaint_default_fonts-0.36.2.crate#fonts/UFL.txt"
+      },
+      {
+        "path": "dependency-licenses/epaint_default_fonts-0.36.2/curated/fonts/emoji-icon-font-mit-license.txt",
+        "url": "https://static.crates.io/crates/epaint_default_fonts/epaint_default_fonts-0.36.2.crate#fonts/emoji-icon-font-mit-license.txt"
+      },
+      {
+        "path": "dependency-licenses/epaint_default_fonts-0.36.2/curated/fonts/Hack-Regular.txt",
+        "url": "https://static.crates.io/crates/epaint_default_fonts/epaint_default_fonts-0.36.2.crate#fonts/Hack-Regular.txt"
+      },
+      {
+        "path": "dependency-licenses/epaint_default_fonts-0.36.2/curated/fonts/NOTICE-FONT-ATTRIBUTION.txt",
+        "url": "https://static.crates.io/crates/epaint_default_fonts/epaint_default_fonts-0.36.2.crate"
+      }
+    ],
+    "unresolved_license_review": []
+  },
+  "limitations": [
+    "These are all-target metadata entries, not proof that any selected binary contains every dependency.",
+    "The source archive does not vendor registry crate code.",
+    "This additional inspection demonstrates remaining native graph coverage gaps; it does not claim native redistribution clearance."
+  ]
+}

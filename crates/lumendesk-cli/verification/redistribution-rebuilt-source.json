@@ -1,0 +1,160 @@
+{
+  "inspection_date": "2026-10-19",
+  "artifact_label": "independent review source archive from the final reviewed SDK changes; not the historical archive",
+  "baseline_revision": "a90f4c2d247c8b0cedd337ac911c12903f6faca8",
+  "kind": "source",
+  "application": "lumendesk-review-web-final",
+  "archive_sha256": "1acfa401e5d607a48e3d5f97924b6e5b49c717d8dc707bcf4b1182e9fc59d55b",
+  "archive_bytes": 280973,
+  "dependency_count": 275,
+  "dependencies_without_notices": [],
+  "verified_registry_sources": 35,
+  "payload_records": 547,
+  "payload_sha256_failures": [],
+  "manifest_dependencies": {
+    "inventory": "DEPENDENCIES.json",
+    "license_review_required": true,
+    "redistribution_review_required": true,
+    "registry_sources_vendored": false,
+    "scope": "All resolved dependency targets; non-bundled registry dependencies are informational for source redistribution."
+  },
+  "unresolved_dependencies": [
+    {
+      "name": "block2",
+      "version": "0.6.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build.",
+        "Upstream supplies an MIT identifier/link without a complete copyright-specific notice. The included unmodified MIT standard text retains its placeholders; it does not invent an attribution or establish that the notice obligation is complete."
+      ]
+    },
+    {
+      "name": "dispatch2",
+      "version": "0.3.1",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2",
+      "version": "0.6.5",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build.",
+        "Upstream supplies an MIT identifier/link without a complete copyright-specific notice. The included unmodified MIT standard text retains its placeholders; it does not invent an attribution or establish that the notice obligation is complete."
+      ]
+    },
+    {
+      "name": "objc2-app-kit",
+      "version": "0.3.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-cloud-kit",
+      "version": "0.3.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-core-data",
+      "version": "0.3.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-core-foundation",
+      "version": "0.3.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-core-graphics",
+      "version": "0.3.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-core-image",
+      "version": "0.3.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-core-location",
+      "version": "0.3.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-core-text",
+      "version": "0.3.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-encode",
+      "version": "4.1.0",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build.",
+        "Upstream supplies an MIT identifier/link without a complete copyright-specific notice. The included unmodified MIT standard text retains its placeholders; it does not invent an attribution or establish that the notice obligation is complete."
+      ]
+    },
+    {
+      "name": "objc2-exception-helper",
+      "version": "0.1.1",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-foundation",
+      "version": "0.3.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build.",
+        "Upstream supplies an MIT identifier/link without a complete copyright-specific notice. The included unmodified MIT standard text retains its placeholders; it does not invent an attribution or establish that the notice obligation is complete."
+      ]
+    },
+    {
+      "name": "objc2-io-surface",
+      "version": "0.3.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-quartz-core",
+      "version": "0.3.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-ui-kit",
+      "version": "0.3.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-user-notifications",
+      "version": "0.3.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    },
+    {
+      "name": "objc2-web-kit",
+      "version": "0.3.2",
+      "review": [
+        "The pinned upstream objc2 LICENSE.md identifies unresolved Apple SDK-derived binding redistribution implications. Review the applicable SDK terms for material in this target build."
+      ]
+    }
+  ]
+}

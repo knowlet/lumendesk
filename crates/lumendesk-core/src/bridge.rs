@@ -1,7 +1,9 @@
 //! The host supplies authorization separately from request JSON. Sessions are not
 //! a substitute for a trusted IPC transport: a frontend cannot attest its origin.
 //! Request IDs increase strictly within each session, starting at any integer.
-use crate::{CoreError, MethodSchema, Result, SchemaRegistry, WindowId};
+use crate::{
+    CoreError, MethodSchema, Result, SchemaRegistry, StreamMethodSchema, StreamSink, WindowId,
+};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use std::{
@@ -67,6 +69,9 @@ impl TrustedOrigin {
 #[derive(Debug, Clone)]
 pub struct BridgeConfig {
     pub trusted_origins: Vec<TrustedOrigin>,
+    /// Encoded byte threshold for requests, successful values, stream items and
+    /// serialized errors. Oversized results become `PayloadTooLarge`; transport
+    /// envelopes have their own overhead and require a separate host wire limit.
     pub max_payload_bytes: usize,
     pub max_pending_per_session: usize,
 }
@@ -172,6 +177,16 @@ impl CallContext {
     pub fn check_cancelled(&self) -> Result<()> {
         self.cancellation.check()
     }
+    fn finish_streams(&self, result: Result<()>) {
+        let completions = {
+            let mut scope = self.streams.lock().unwrap();
+            scope.finished = true;
+            std::mem::take(&mut scope.completions)
+        };
+        for complete in completions {
+            complete(result.clone());
+        }
+    }
     /// Open a bounded stream tied to this call. At most 16 streams may be opened.
     /// Returning from the handler closes every unfinished stream, preserving FIFO
     /// values before completion. The host drains streams before delivering the
@@ -205,6 +220,8 @@ impl std::fmt::Debug for CallContext {
 }
 
 type Handler = Arc<dyn Fn(CallContext, Value) -> Result<Value> + Send + Sync>;
+type StreamHandler =
+    Arc<dyn Fn(CallContext, Value, crate::StreamSender<Value>) -> Result<Value> + Send + Sync>;
 struct Session {
     token: SessionToken,
     origin: TrustedOrigin,
@@ -229,6 +246,7 @@ impl Drop for Session {
 #[derive(Default)]
 struct State {
     methods: BTreeMap<String, Handler>,
+    stream_methods: BTreeMap<String, StreamHandler>,
     schemas: SchemaRegistry,
     windows: BTreeMap<WindowId, Option<Session>>,
     closed: BTreeSet<WindowId>,
@@ -290,6 +308,132 @@ impl Bridge {
             }),
         );
         Ok(())
+    }
+
+    /// Register a frontend-facing stream. Item serialization, item schema, item
+    /// size, argument schema and terminal result schema are checked independently.
+    /// Returning (or panicking) seals the producer and supplies its terminal result.
+    pub fn register_stream<A, T, R, F>(&self, schema: StreamMethodSchema, handler: F) -> Result<()>
+    where
+        A: DeserializeOwned + 'static,
+        T: Serialize + 'static,
+        R: Serialize + 'static,
+        F: Fn(CallContext, A, StreamSink<T>) -> Result<R> + Send + Sync + 'static,
+    {
+        let mut state = self.0.state.lock().unwrap();
+        state.schemas.register_stream(schema.clone())?;
+        let max_payload_bytes = self.0.config.max_payload_bytes;
+        state.stream_methods.insert(
+            schema.name,
+            Arc::new(move |context, args, sender| {
+                context.check_cancelled()?;
+                schema
+                    .arguments
+                    .validate(&args)
+                    .map_err(CoreError::InvalidArguments)?;
+                let typed = serde_json::from_value(args)
+                    .map_err(|error| CoreError::InvalidArguments(error.to_string()))?;
+                let sink = StreamSink::new(sender, schema.item.clone(), max_payload_bytes);
+                let output = handler(context.clone(), typed, sink)?;
+                context.check_cancelled()?;
+                let result = serde_json::to_value(output)
+                    .map_err(|error| CoreError::InvalidResult(error.to_string()))?;
+                schema
+                    .result
+                    .validate(&result)
+                    .map_err(CoreError::InvalidResult)?;
+                Ok(result)
+            }),
+        );
+        Ok(())
+    }
+
+    /// Admit a stream in the same ordered request-ID namespace as ordinary calls.
+    /// Run the returned job on a backend worker and retain its receiver on the
+    /// trusted host. Admission does not execute user code or start an OS thread.
+    /// The session budget includes streams that finished but have not been drained.
+    pub fn begin_stream(
+        &self,
+        auth: &Authorization,
+        request: CallRequest,
+        capacity: usize,
+    ) -> Result<(StreamCall, BridgeStreamReceiver)> {
+        self.begin_stream_inner(auth, request, capacity)
+            .map_err(|error| self.bound_error(error))
+    }
+
+    fn begin_stream_inner(
+        &self,
+        auth: &Authorization,
+        request: CallRequest,
+        capacity: usize,
+    ) -> Result<(StreamCall, BridgeStreamReceiver)> {
+        if capacity == 0 {
+            return Err(CoreError::InvalidConfiguration(
+                "stream capacity must be positive".into(),
+            ));
+        }
+        self.validate_request(&request)?;
+        let (handler, cancellation) = {
+            let mut state = self.0.state.lock().unwrap();
+            self.check_authorization(&mut state, auth)?;
+            let handler = state
+                .stream_methods
+                .get(&request.method)
+                .cloned()
+                .ok_or_else(|| CoreError::UnknownMethod(request.method.clone()))?;
+            let session = self.check_authorization(&mut state, auth)?;
+            let cancellation = self.reserve_request(session, request.id)?;
+            (handler, cancellation)
+        };
+        let context = CallContext {
+            window: auth.window,
+            request_id: request.id,
+            cancellation,
+            streams: Arc::new(Mutex::new(StreamScope::default())),
+        };
+        // Capacity is checked above; the newly created scope has no streams.
+        // A concurrent navigation can still cancel between admission and creation.
+        let (sender, receiver) = match context.stream(capacity) {
+            Ok(pair) => pair,
+            Err(error) => {
+                self.release_request(auth, request.id);
+                return Err(error);
+            }
+        };
+        let terminal = Arc::new(Mutex::new(None));
+        Ok((
+            StreamCall {
+                bridge: self.clone(),
+                auth: auth.clone(),
+                context,
+                terminal: terminal.clone(),
+                work: Some((handler, request.args, sender)),
+            },
+            BridgeStreamReceiver {
+                bridge: self.clone(),
+                auth: auth.clone(),
+                request_id: request.id,
+                receiver,
+                terminal,
+                released: AtomicBool::new(false),
+            },
+        ))
+    }
+
+    /// Raw-wire variant; enforce the byte limit before parsing untrusted JSON.
+    pub fn begin_stream_json(
+        &self,
+        auth: &Authorization,
+        bytes: &[u8],
+        capacity: usize,
+    ) -> Result<(StreamCall, BridgeStreamReceiver)> {
+        if bytes.len() > self.0.config.max_payload_bytes {
+            return Err(CoreError::PayloadTooLarge);
+        }
+        let request = serde_json::from_slice(bytes)
+            .map_err(|error| self.bound_error(CoreError::InvalidArguments(error.to_string())))?;
+        self.begin_stream(auth, request, capacity)
     }
 
     pub fn schemas(&self) -> SchemaRegistry {
@@ -403,6 +547,24 @@ impl Bridge {
         Ok(true)
     }
 
+    /// Observe cancellation for admitted work or a request waiting in a host
+    /// queue, without consuming its pre-cancel tombstone or a stream item.
+    /// A request with neither a pending token nor a tombstone returns `false`.
+    pub fn is_request_cancelled(&self, auth: &Authorization, request_id: u64) -> Result<bool> {
+        if request_id > 9_007_199_254_740_991 {
+            return Err(CoreError::InvalidArguments(
+                "request IDs must be JavaScript-safe integers".into(),
+            ));
+        }
+        let mut state = self.0.state.lock().unwrap();
+        let session = self.check_authorization(&mut state, auth)?;
+        Ok(session.precancelled.contains(&request_id)
+            || session
+                .pending
+                .get(&request_id)
+                .is_some_and(CancellationToken::is_cancelled))
+    }
+
     /// Recheck on the host UI thread before delivering a completed response.
     pub fn authorize(&self, auth: &Authorization) -> Result<()> {
         self.check_authorization(&mut self.0.state.lock().unwrap(), auth)
@@ -414,7 +576,7 @@ impl Bridge {
             return Err(CoreError::PayloadTooLarge);
         }
         let request = serde_json::from_slice(bytes)
-            .map_err(|e| CoreError::InvalidArguments(e.to_string()))?;
+            .map_err(|e| self.bound_error(CoreError::InvalidArguments(e.to_string())))?;
         Ok(self.dispatch(auth, request))
     }
 
@@ -422,11 +584,36 @@ impl Bridge {
         let id = request.id;
         CallResponse {
             id,
-            result: self.dispatch_inner(auth, request),
+            result: self
+                .dispatch_inner(auth, request)
+                .map_err(|error| self.bound_error(error)),
         }
     }
 
-    fn dispatch_inner(&self, auth: &Authorization, request: CallRequest) -> Result<Value> {
+    fn check_result_size<T: Serialize>(&self, value: &T) -> Result<()> {
+        let bytes = serde_json::to_vec(value)
+            .map_err(|error| CoreError::InvalidResult(error.to_string()))?;
+        if bytes.len() > self.0.config.max_payload_bytes {
+            return Err(CoreError::PayloadTooLarge);
+        }
+        Ok(())
+    }
+
+    fn bound_error(&self, error: CoreError) -> CoreError {
+        self.check_result_size(&error).err().unwrap_or(error)
+    }
+
+    fn bound_result(&self, result: Result<Value>) -> Result<Value> {
+        match result {
+            Ok(value) => {
+                self.check_result_size(&value)?;
+                Ok(value)
+            }
+            Err(error) => Err(self.bound_error(error)),
+        }
+    }
+
+    fn validate_request(&self, request: &CallRequest) -> Result<()> {
         if request.id > 9_007_199_254_740_991 {
             return Err(CoreError::InvalidArguments(
                 "request IDs must be JavaScript-safe integers".into(),
@@ -437,6 +624,44 @@ impl Bridge {
         if bytes.len() > self.0.config.max_payload_bytes {
             return Err(CoreError::PayloadTooLarge);
         }
+        Ok(())
+    }
+
+    fn reserve_request(&self, session: &mut Session, id: u64) -> Result<CancellationToken> {
+        if session.last_request.is_some_and(|last| id <= last) {
+            return Err(CoreError::ReusedRequestId);
+        }
+        if session.precancelled.remove(&id) {
+            session.last_request = Some(id);
+            session.precancelled.retain(|other| *other > id);
+            return Err(CoreError::Cancelled);
+        }
+        let future_tombstones = session
+            .precancelled
+            .iter()
+            .filter(|other| **other > id)
+            .count();
+        if session.pending.len() + future_tombstones >= self.0.config.max_pending_per_session {
+            return Err(CoreError::QueueFull);
+        }
+        session.last_request = Some(id);
+        session.precancelled.retain(|other| *other > id);
+        let cancellation = session.cancellation.child();
+        session.pending.insert(id, cancellation.clone());
+        Ok(cancellation)
+    }
+
+    fn release_request(&self, auth: &Authorization, request_id: u64) {
+        let mut state = self.0.state.lock().unwrap();
+        if let Some(Some(session)) = state.windows.get_mut(&auth.window)
+            && session.token == auth.session
+        {
+            session.pending.remove(&request_id);
+        }
+    }
+
+    fn dispatch_inner(&self, auth: &Authorization, request: CallRequest) -> Result<Value> {
+        self.validate_request(&request)?;
         let (handler, cancellation) = {
             let mut state = self.0.state.lock().unwrap();
             self.check_authorization(&mut state, auth)?;
@@ -446,26 +671,7 @@ impl Bridge {
                 .cloned()
                 .ok_or_else(|| CoreError::UnknownMethod(request.method.clone()))?;
             let session = self.check_authorization(&mut state, auth)?;
-            if session.last_request.is_some_and(|last| request.id <= last) {
-                return Err(CoreError::ReusedRequestId);
-            }
-            if session.precancelled.remove(&request.id) {
-                session.last_request = Some(request.id);
-                session.precancelled.retain(|id| *id > request.id);
-                return Err(CoreError::Cancelled);
-            }
-            let future_tombstones = session
-                .precancelled
-                .iter()
-                .filter(|id| **id > request.id)
-                .count();
-            if session.pending.len() + future_tombstones >= self.0.config.max_pending_per_session {
-                return Err(CoreError::QueueFull);
-            }
-            session.last_request = Some(request.id);
-            session.precancelled.retain(|id| *id > request.id);
-            let cancellation = session.cancellation.child();
-            session.pending.insert(request.id, cancellation.clone());
+            let cancellation = self.reserve_request(session, request.id)?;
             (handler, cancellation)
         };
         let streams = Arc::new(Mutex::new(StreamScope::default()));
@@ -475,17 +681,9 @@ impl Bridge {
             cancellation: cancellation.clone(),
             streams: streams.clone(),
         };
-        let mut result = catch_unwind(AssertUnwindSafe(|| handler(context, request.args)))
+        let result = catch_unwind(AssertUnwindSafe(|| handler(context, request.args)))
             .unwrap_or(Err(CoreError::BackendPanic));
-        if let Ok(value) = &result {
-            match serde_json::to_vec(value) {
-                Ok(bytes) if bytes.len() > self.0.config.max_payload_bytes => {
-                    result = Err(CoreError::PayloadTooLarge)
-                }
-                Err(error) => result = Err(CoreError::InvalidResult(error.to_string())),
-                _ => (),
-            }
-        }
+        let mut result = self.bound_result(result);
         {
             let mut state = self.0.state.lock().unwrap();
             if cancellation.is_cancelled() || self.check_authorization(&mut state, auth).is_err() {
@@ -506,6 +704,131 @@ impl Bridge {
             complete(result.as_ref().map(|_| ()).map_err(Clone::clone));
         }
         result
+    }
+}
+
+/// Transport-neutral stream frames. Completion is emitted exactly once and only
+/// after every buffered item. Cancellation instead returns `Err(Cancelled)`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum StreamResponseItem {
+    Value { sequence: u64, value: Value },
+    Complete(Result<Value>),
+}
+
+type TerminalResult = Arc<Mutex<Option<Result<Value>>>>;
+
+/// An admitted one-shot producer job. The host chooses a bounded worker pool;
+/// this type never creates threads. Dropping an unrun job reports a terminal error.
+pub struct StreamCall {
+    bridge: Bridge,
+    auth: Authorization,
+    context: CallContext,
+    terminal: TerminalResult,
+    work: Option<(StreamHandler, Value, crate::StreamSender<Value>)>,
+}
+
+impl StreamCall {
+    pub fn run(mut self) {
+        let (handler, args, sender) = self.work.take().expect("stream job runs once");
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            handler(self.context.clone(), args, sender)
+        }))
+        .unwrap_or(Err(CoreError::BackendPanic));
+        self.finish(result);
+    }
+    pub fn request_id(&self) -> u64 {
+        self.context.request_id
+    }
+    pub fn authorization(&self) -> &Authorization {
+        &self.auth
+    }
+
+    fn finish(&self, result: Result<Value>) {
+        // Bound errors as well as successful values before cloning a terminal
+        // error into the call's stream-completion slots.
+        let mut result = self.bridge.bound_result(result);
+        if self.context.cancellation.is_cancelled() || self.bridge.authorize(&self.auth).is_err() {
+            result = Err(CoreError::Cancelled);
+        }
+        let completion = result.as_ref().map(|_| ()).map_err(Clone::clone);
+        *self.terminal.lock().unwrap() = Some(result);
+        self.context.finish_streams(completion);
+    }
+}
+
+impl Drop for StreamCall {
+    fn drop(&mut self) {
+        if self.work.is_some() {
+            self.finish(Err(CoreError::Backend(
+                "stream worker dropped before execution".into(),
+            )));
+        }
+    }
+}
+
+/// Host-side receiver retaining the original window, session and request authority.
+/// Only poll when the frontend has demand; do not eagerly drain into another queue.
+/// Recheck `Bridge::authorize` immediately before delivering each frame to a page.
+pub struct BridgeStreamReceiver {
+    bridge: Bridge,
+    auth: Authorization,
+    request_id: u64,
+    receiver: crate::StreamReceiver<Value>,
+    terminal: TerminalResult,
+    released: AtomicBool,
+}
+
+impl BridgeStreamReceiver {
+    pub fn request_id(&self) -> u64 {
+        self.request_id
+    }
+    pub fn authorization(&self) -> &Authorization {
+        &self.auth
+    }
+    pub fn queued_len(&self) -> usize {
+        self.receiver.queued_len()
+    }
+    pub fn is_complete(&self) -> bool {
+        self.released.load(Ordering::Acquire)
+    }
+    pub fn cancel(&self) {
+        self.receiver.cancel();
+        self.release();
+    }
+    fn release(&self) {
+        if !self.released.swap(true, Ordering::AcqRel) {
+            self.bridge.release_request(&self.auth, self.request_id);
+        }
+    }
+    pub fn try_next(&self) -> Result<Option<StreamResponseItem>> {
+        match self.receiver.try_next() {
+            Ok(Some(crate::StreamItem::Value { sequence, value })) => {
+                Ok(Some(StreamResponseItem::Value { sequence, value }))
+            }
+            Ok(Some(crate::StreamItem::Complete(completion))) => {
+                let result = self.terminal.lock().unwrap().take().unwrap_or_else(|| {
+                    Err(completion.err().unwrap_or_else(|| {
+                        CoreError::Backend("stream completed without a terminal result".into())
+                    }))
+                });
+                self.release();
+                Ok(Some(StreamResponseItem::Complete(result)))
+            }
+            Err(error) => {
+                self.release();
+                Err(error)
+            }
+            Ok(None) => Ok(None),
+        }
+    }
+}
+
+impl Drop for BridgeStreamReceiver {
+    fn drop(&mut self) {
+        if !self.receiver.is_complete() {
+            self.receiver.cancel();
+        }
+        self.release();
     }
 }
 

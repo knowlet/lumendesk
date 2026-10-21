@@ -46,9 +46,13 @@ sanitizer. A malicious trusted script has the app's bridge privileges.
 
 ## Bounds and lifetime
 
-Wire messages are capped at 1 MiB. The frontend permits 32 pending calls. Each
+Incoming wire messages are capped at 1 MiB. The core separately bounds encoded
+request/item/success/error payloads; outgoing callback envelopes and JSON-string
+escaping add bytes beyond that payload threshold. The frontend permits 32
+pending calls. Each
 web window has a bounded, ordered 32-job worker queue. Timeout requests cancellation
-and drops the frontend promise. There is one backend worker per web window;
+and drops the frontend promise. Each window has one ordered admission/ordinary-call
+worker. Streaming producers run separately under the retained worker-permit limits;
 handlers must return cooperatively and must not block forever. Rust cannot safely
 force-stop arbitrary user code.
 
@@ -57,10 +61,32 @@ Host event schemas are validated before enqueue; per-window queues hold at most
 queues return errors. Events queue before readiness; navigation discards the old
 page's queued events and listeners. Event callbacks should remain short.
 
-Rust streams are bounded, preserve FIFO order, cancel when the consumer drops,
-and terminate when their originating call returns. They are not wired to the
-JavaScript host transport in this milestone. The core stream contract is not a
-claim of browser-stream support.
+Frontend streams are explicitly registered separately from ordinary calls. Each
+stream has a bounded Rust queue, and the host sends one item per frontend read
+credit. Completion follows all queued items. Iterator return, abort, page closure
+and navigation cancel the producer. The host caps 64 total streams, 16 per window,
+128 queued/running ordinary calls and 16 windows. Cancelled noncooperative handlers
+retain their worker permit until they actually exit. This prevents cancellation
+from becoming a way to spawn unlimited threads. Incoming command queues are also
+bounded; raw IPC flooding is dropped and times out. Cancellation signals reach
+the core immediately, bypassing a saturated incoming queue.
+The host reclaims cancelled stream slots without requiring read credit or a
+queued cancellation command, while noncooperative worker permits remain held
+until the worker exits. Oversized terminal errors are replaced before they can
+be cloned into stream completion slots.
+
+Host-generated callbacks carry the target session into the JavaScript closure,
+which rechecks it at execution time. JSON payloads are parsed from escaped
+strings, preserving keys such as `__proto__` as data. Shared Rust/Node fixtures
+exercise delayed-delivery and data-integrity contracts; actual engine navigation
+and iframe behavior remain unverified.
+
+The runtime defaults to a 30-second idle/read timeout. The host enforces a
+60-second idle/read ceiling and sends an explicit terminal error on expiry, even
+if a larger frontend timeout was requested. Awaiting a stream's `.result` without
+draining the iterator deliberately backpressures and eventually times out.
+Actual Wry stream execution is not verified; mock JavaScript and Rust host tests
+share exact wire fixtures. Legacy call-bound Rust streams remain available too.
 
 Embedded assets are served from an in-memory allowlist, never from the filesystem.
 Traversal (including repeated percent encoding), NULs and backslashes are rejected.

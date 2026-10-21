@@ -1,5 +1,5 @@
 use crate::Result;
-use lumendesk_core::{Field, MethodSchema, Schema, SchemaRegistry};
+use lumendesk_core::{Field, MethodSchema, Schema, SchemaRegistry, StreamMethodSchema};
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 #[serde(deny_unknown_fields)]
 struct RegistryFile {
     methods: BTreeMap<String, MethodSchema>,
+    #[serde(default)]
+    streams: BTreeMap<String, StreamMethodSchema>,
     #[serde(default)]
     events: BTreeMap<String, Schema>,
 }
@@ -26,6 +28,17 @@ pub fn generate_typescript(value: &Value) -> Result<String> {
         }
         registry
             .register_method(method)
+            .map_err(|error| error.to_string())?;
+    }
+    for (key, stream) in source.streams {
+        if key != stream.name {
+            return Err(format!(
+                "stream key '{key}' does not match its name '{}'",
+                stream.name
+            ));
+        }
+        registry
+            .register_stream(stream)
             .map_err(|error| error.to_string())?;
     }
     for (name, schema) in source.events {

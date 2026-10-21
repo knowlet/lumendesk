@@ -27,13 +27,14 @@ function trackedAbortController() {
   return { controller, signal, listeners };
 }
 
-function makeRuntime({ iframe = false, ipc = true, throwTransport = false, existing } = {}) {
+function makeRuntime({ iframe = false, ipc = true, throwTransport = false, throwTransportAt, existing, session = SESSION } = {}) {
   const outbound = [];
   const errors = [];
   const timers = new Map();
   const handlers = new Map();
   const dispatched = [];
   let timerId = 0;
+  let transportCalls = 0;
   const window = {
     addEventListener(name, callback, options = {}) {
       if (!handlers.has(name)) handlers.set(name, []);
@@ -55,7 +56,8 @@ function makeRuntime({ iframe = false, ipc = true, throwTransport = false, exist
     window.ipc = {
       postMessage(message) {
         assert.equal(this, window.ipc, 'the transport retains its receiver');
-        if (throwTransport) throw new Error('mock transport unavailable');
+        transportCalls++;
+        if (throwTransport || transportCalls === throwTransportAt) throw new Error('mock transport unavailable');
         outbound.push(JSON.parse(message));
       },
     };
@@ -67,14 +69,16 @@ function makeRuntime({ iframe = false, ipc = true, throwTransport = false, exist
     setTimeout(callback, delay) { const id = ++timerId; timers.set(id, { callback, delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
   });
-  const script = source.replace('__SESSION__', JSON.stringify(SESSION)).replace('__RUNTIME__', JSON.stringify(RUNTIME));
+  const script = source.replace('__SESSION__', JSON.stringify(session)).replace('__RUNTIME__', JSON.stringify(RUNTIME));
   const install = () => vm.runInContext(script, context, { filename: 'lumendesk/runtime.js' });
   install();
   return {
     window, outbound, errors, timers, dispatched, install,
+    evaluate(script) { vm.runInContext(script, context); },
     request(index = outbound.length - 1) { return outbound[index].request; },
-    respond(id, result) { window.__lumenResponse({ id, result }); },
-    emit(name, payload) { window.__lumenEvent(name, payload); },
+    respond(id, result) { window.__lumenResponse(session, { id, result }); },
+    emit(name, payload) { window.__lumenEvent(session, name, payload); },
+    streamFrame(frame) { window.__lumenStream(session, frame); },
     pagehide() { window.dispatchEvent({ type: 'pagehide' }); },
     fireTimer(id = timers.keys().next().value) {
       const entry = timers.get(id);
@@ -91,7 +95,7 @@ test('installs an immutable runtime and announces readiness exactly once', () =>
   assert.equal(r.window.lumen.runtime.windowId, RUNTIME.windowId);
   assert.ok(Object.isFrozen(r.window.lumen));
   assert.ok(Object.isFrozen(r.window.lumen.runtime));
-  for (const property of ['lumen', '__lumenResponse', '__lumenEvent']) {
+  for (const property of ['lumen', '__lumenResponse', '__lumenEvent', '__lumenStream']) {
     const descriptor = Object.getOwnPropertyDescriptor(r.window, property);
     assert.equal(descriptor.writable, false);
     assert.equal(descriptor.configurable, false);
@@ -106,6 +110,7 @@ test('ordinary browser without the native IPC transport receives no runtime', ()
   assert.equal(r.window.lumen, undefined);
   assert.equal(r.window.__lumenResponse, undefined);
   assert.equal(r.window.__lumenEvent, undefined);
+  assert.equal(r.window.__lumenStream, undefined);
   assert.deepEqual(r.dispatched, []);
   assert.equal(r.timers.size, 0);
 });
@@ -115,6 +120,7 @@ test('a mocked embedded frame cannot install the runtime even with IPC present',
   assert.equal(r.window.lumen, undefined);
   assert.equal(r.window.__lumenResponse, undefined);
   assert.equal(r.window.__lumenEvent, undefined);
+  assert.equal(r.window.__lumenStream, undefined);
   assert.deepEqual(r.outbound, []);
   assert.deepEqual(r.dispatched, []);
 });
@@ -200,7 +206,7 @@ for (const [label, result] of [
     const rejection = assert.rejects(promise, error =>
       error.message === 'Malformed backend response' && error.code === 'malformed_response');
     const response = result === undefined ? { id: 1 } : { id: 1, result };
-    assert.doesNotThrow(() => r.window.__lumenResponse(response));
+    assert.doesNotThrow(() => r.window.__lumenResponse(SESSION, response));
     await rejection;
     assert.equal(r.timers.size, 0);
     r.respond(1, { Ok: 'late response ignored' });
@@ -215,7 +221,7 @@ test('unidentifiable malformed response envelopes leave valid calls and timers i
   const r = makeRuntime();
   const promise = r.window.lumen.call('echo', null);
   for (const response of [null, undefined, false, 42, 'bad', [], {}, { id: '1', result: null }]) {
-    assert.doesNotThrow(() => r.window.__lumenResponse(response));
+    assert.doesNotThrow(() => r.window.__lumenResponse(SESSION, response));
     assert.equal(r.timers.size, 1);
   }
   r.respond(1, { Ok: 'still pending until a matching reply' });
@@ -227,7 +233,7 @@ test('a throwing matching result accessor cannot strand its promise', async () =
   const r = makeRuntime();
   const promise = r.window.lumen.call('echo', null);
   const rejection = assert.rejects(promise, /Malformed backend response/);
-  assert.doesNotThrow(() => r.window.__lumenResponse({
+  assert.doesNotThrow(() => r.window.__lumenResponse(SESSION, {
     id: 1,
     get result() { throw new Error('invalid accessor'); },
   }));
@@ -514,3 +520,785 @@ test('pagehide clears previously registered event listeners', () => {
   r.emit('greeting', null);
   assert.equal(count, 0);
 });
+
+// Streaming cases below use the same mock VM. They do not exercise a webview,
+// native host scheduling, or a graphical desktop.
+const normalized = value => JSON.parse(JSON.stringify(value));
+const pullFrames = runtime => runtime.outbound.filter(frame => 'pull' in frame);
+const cancelFrames = runtime => runtime.outbound.filter(frame => 'cancel' in frame);
+const isCancelled = error => error.name === 'AbortError' && error.code === 'cancelled';
+const isMalformedStream = error => error.code === 'malformed_response' && /Malformed backend stream/.test(error.message);
+
+function completeStream(runtime, id, value) {
+  runtime.streamFrame({ id, done: true, result: { Ok: value } });
+}
+
+test('stream registration is independent and IDs are shared monotonically with calls', async () => {
+  const r = makeRuntime();
+  const call = r.window.lumen.call('echo', 'before');
+  const args = { title: '星雲 🌌', items: [null, false, 0] };
+  const stream = r.window.lumen.stream('numbers', args);
+  const after = r.window.lumen.call('echo', 'after');
+  assert.deepEqual(r.outbound, [
+    { session: SESSION, request: { id: 1, method: 'echo', args: 'before' } },
+    { session: SESSION, stream: { id: 2, method: 'numbers', args } },
+    { session: SESSION, request: { id: 3, method: 'echo', args: 'after' } },
+  ]);
+  assert.equal(stream[Symbol.asyncIterator](), stream);
+  const property = Object.getOwnPropertyDescriptor(stream, 'result');
+  assert.equal(property.writable, false);
+  assert.equal(property.configurable, false);
+  const next = stream.next();
+  completeStream(r, 2, 'finished');
+  assert.deepEqual(normalized(await next), { done: true, value: 'finished' });
+  assert.equal(await stream.result, 'finished');
+  r.respond(1, { Ok: 1 }); r.respond(3, { Ok: 3 });
+  await Promise.all([call, after]);
+  assert.equal(r.timers.size, 0);
+});
+
+test('slow consumers grant exactly one pull for each next with no eager item buffering', async () => {
+  const r = makeRuntime();
+  const stream = r.window.lumen.stream('numbers', null);
+  let complete = false;
+  stream.result.then(() => { complete = true; });
+  assert.equal(pullFrames(r).length, 0);
+  assert.equal(r.timers.size, 1, 'unstarted streams have an idle timer');
+  for (let value = 0; value < 200; value++) {
+    const next = stream.next();
+    assert.deepEqual(pullFrames(r).at(-1), { session: SESSION, pull: 1 });
+    assert.equal(pullFrames(r).length, value + 1);
+    r.streamFrame({ id: 1, item: value });
+    assert.deepEqual(normalized(await next), { done: false, value });
+    await Promise.resolve();
+    assert.equal(pullFrames(r).length, value + 1, 'consumer pause grants no extra credit');
+    assert.equal(r.timers.size, 1, 'one bounded idle timer replaces the completed read timer');
+    assert.equal(complete, false);
+  }
+  const final = stream.next();
+  completeStream(r, 1, { count: 200 });
+  assert.deepEqual(normalized(await final), { done: true, value: { count: 200 } });
+  assert.deepEqual(await stream.result, { count: 200 });
+  assert.equal(complete, true);
+  assert.equal(r.timers.size, 0);
+  assert.equal(cancelFrames(r).length, 0);
+  const pullsBefore = pullFrames(r).length;
+  assert.equal((await stream.next()).done, true);
+  assert.equal(pullFrames(r).length, pullsBefore, 'completed reads do not contact the host');
+});
+
+test('for-await delivers ordered Unicode and falsy items before terminal completion', async () => {
+  const r = makeRuntime();
+  const stream = r.window.lumen.stream('values', null);
+  const values = [null, false, 0, '', '星雲 🌠', { nested: [1, 2] }];
+  const received = [];
+  const consume = (async () => {
+    for await (const item of stream) received.push(item);
+  })();
+  for (const value of values) {
+    r.streamFrame({ id: 1, item: value });
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  completeStream(r, 1, 'all delivered');
+  await consume;
+  assert.deepEqual(received, values);
+  assert.equal(await stream.result, 'all delivered');
+  assert.equal(pullFrames(r).length, values.length + 1);
+  assert.equal(r.timers.size, 0);
+});
+
+test('terminal immediately after the last item is retained until the following next', async () => {
+  const r = makeRuntime();
+  const stream = r.window.lumen.stream('one', null);
+  const item = stream.next();
+  r.streamFrame({ id: 1, item: 'last' });
+  completeStream(r, 1, 'final result');
+  assert.deepEqual(normalized(await item), { done: false, value: 'last' });
+  assert.equal(await stream.result, 'final result');
+  assert.deepEqual(normalized(await stream.next()), { done: true, value: 'final result' });
+  assert.equal((await stream.next()).value, undefined);
+  assert.equal(pullFrames(r).length, 1);
+  assert.equal(r.timers.size, 0);
+});
+
+test('a concurrent next rejects explicitly without stealing the first read or sending credit', async () => {
+  const r = makeRuntime();
+  const stream = r.window.lumen.stream('numbers', null);
+  const first = stream.next();
+  await assert.rejects(stream.next(), error => error.code === 'concurrent_read');
+  assert.equal(pullFrames(r).length, 1);
+  r.streamFrame({ id: 1, item: 123 });
+  assert.deepEqual(normalized(await first), { done: false, value: 123 });
+  const final = stream.next();
+  completeStream(r, 1, null);
+  assert.equal((await final).done, true);
+  assert.equal(await stream.result, null);
+});
+
+test('multiple streams and a call remain isolated across out-of-order replies', async () => {
+  const r = makeRuntime();
+  const left = r.window.lumen.stream('left', null);
+  const right = r.window.lumen.stream('right', null);
+  const call = r.window.lumen.call('echo', null);
+  const l1 = left.next(); const r1 = right.next();
+  r.streamFrame({ id: 3, item: 'cannot settle a call' });
+  r.respond(1, { Ok: 'cannot settle a stream' });
+  r.streamFrame({ id: 2, item: 'right first' });
+  r.respond(3, { Ok: 'call result' });
+  r.streamFrame({ id: 1, item: 'left first' });
+  assert.equal((await l1).value, 'left first');
+  assert.equal((await r1).value, 'right first');
+  assert.equal(await call, 'call result');
+  const lf = left.next(); const rf = right.next();
+  completeStream(r, 2, 'right done'); completeStream(r, 1, 'left done');
+  assert.equal((await lf).value, 'left done');
+  assert.equal((await rf).value, 'right done');
+  assert.equal(await left.result, 'left done');
+  assert.equal(await right.result, 'right done');
+  assert.equal(r.timers.size, 0);
+});
+
+for (const pending of [false, true]) {
+  test(`return cancels exactly once, cleans listeners, and closes ${pending ? 'a pending' : 'an idle'} read`, async () => {
+    const r = makeRuntime();
+    const { controller, signal, listeners } = trackedAbortController();
+    const stream = r.window.lumen.stream('numbers', null, signal);
+    const read = pending ? stream.next() : undefined;
+    const result = assert.rejects(stream.result, isCancelled);
+    const returned = await stream.return('consumer result');
+    assert.deepEqual(normalized(returned), { done: true, value: 'consumer result' });
+    if (read) assert.equal((await read).done, true);
+    await result;
+    assert.deepEqual(cancelFrames(r), [{ session: SESSION, cancel: 1 }]);
+    assert.equal(listeners.size, 0);
+    assert.equal(r.timers.size, 0);
+    await stream.return(); controller.abort();
+    r.streamFrame({ id: 1, item: 'late' }); completeStream(r, 1, 'late');
+    assert.equal((await stream.next()).done, true);
+    assert.equal(cancelFrames(r).length, 1);
+  });
+}
+
+test('breaking for-await closes the host stream and rejects the final-result promise', async () => {
+  const r = makeRuntime();
+  const stream = r.window.lumen.stream('numbers', null);
+  const result = assert.rejects(stream.result, isCancelled);
+  const consume = (async () => { for await (const value of stream) { assert.equal(value, 5); break; } })();
+  r.streamFrame({ id: 1, item: 5 });
+  await consume; await result;
+  assert.deepEqual(cancelFrames(r), [{ session: SESSION, cancel: 1 }]);
+  assert.equal(r.timers.size, 0);
+});
+
+test('throw rejects a pending reader and result, cancels once, and returns its rejection', async () => {
+  const r = makeRuntime();
+  const { signal, listeners } = trackedAbortController();
+  const stream = r.window.lumen.stream('numbers', null, signal);
+  const failure = new Error('consumer failed');
+  const read = assert.rejects(stream.next(), error => error === failure);
+  const result = assert.rejects(stream.result, error => error === failure);
+  await assert.rejects(stream.throw(failure), error => error === failure);
+  await Promise.all([read, result]);
+  assert.equal((await stream.next()).done, true);
+  assert.equal(cancelFrames(r).length, 1);
+  assert.equal(listeners.size, 0);
+  assert.equal(r.timers.size, 0);
+});
+
+for (const wrapped of [false, true]) {
+  test(`already-aborted stream ${wrapped ? 'options' : 'direct signal'} sends no IPC and allocates no resources`, async () => {
+    const r = makeRuntime();
+    const { controller, signal, listeners } = trackedAbortController();
+    controller.abort();
+    const stream = r.window.lumen.stream('numbers', null, wrapped ? { signal, timeoutMs: 8 } : signal);
+    await assert.rejects(stream.next(), isCancelled);
+    await assert.rejects(stream.result, isCancelled);
+    assert.equal((await stream.next()).done, true);
+    assert.equal(listeners.size, 0);
+    assert.equal(r.timers.size, 0);
+    assert.deepEqual(r.outbound, []);
+  });
+}
+
+for (const pending of [false, true]) {
+  test(`abort closes ${pending ? 'a pending' : 'an idle'} stream and ignores later items`, async () => {
+    const r = makeRuntime();
+    const { controller, signal, listeners } = trackedAbortController();
+    const stream = r.window.lumen.stream('numbers', null, { signal, timeoutMs: 11 });
+    const next = pending ? assert.rejects(stream.next(), isCancelled) : undefined;
+    const result = assert.rejects(stream.result, isCancelled);
+    controller.abort();
+    if (next) await next; else await assert.rejects(stream.next(), isCancelled);
+    await result;
+    r.streamFrame({ id: 1, item: 'late' });
+    assert.equal((await stream.next()).done, true);
+    assert.equal(listeners.size, 0);
+    assert.equal(r.timers.size, 0);
+    assert.deepEqual(cancelFrames(r), [{ session: SESSION, cancel: 1 }]);
+  });
+}
+
+test('aborting while serializing stream arguments sends nothing and leaves no listener or timer', async () => {
+  const r = makeRuntime();
+  const { controller, signal, listeners } = trackedAbortController();
+  const stream = r.window.lumen.stream('numbers', { toJSON() { controller.abort(); return null; } }, signal);
+  await assert.rejects(stream.next(), isCancelled);
+  await assert.rejects(stream.result, isCancelled);
+  assert.deepEqual(r.outbound, []);
+  assert.equal(listeners.size, 0);
+  assert.equal(r.timers.size, 0);
+});
+
+test('pagehide rejects pending and idle streams, cancels both, and bars new streams', async () => {
+  const r = makeRuntime();
+  const { controller, signal, listeners } = trackedAbortController();
+  const pending = r.window.lumen.stream('numbers', null, signal);
+  const idle = r.window.lumen.stream('numbers', null, signal);
+  const read = assert.rejects(pending.next(), /Page session ended/);
+  const results = [pending, idle].map(stream => assert.rejects(stream.result, /Page session ended/));
+  r.pagehide();
+  await read; await Promise.all(results);
+  await assert.rejects(idle.next(), /Page session ended/);
+  assert.deepEqual(cancelFrames(r), [{ session: SESSION, cancel: 1 }, { session: SESSION, cancel: 2 }]);
+  assert.equal(listeners.size, 0);
+  assert.equal(r.timers.size, 0);
+  const created = r.window.lumen.stream('numbers', null);
+  await assert.rejects(created.next(), /Page session ended/);
+  await assert.rejects(created.result, /Page session ended/);
+  controller.abort(); r.pagehide();
+  assert.equal(r.outbound.length, 5);
+});
+
+for (const stage of ['unstarted', 'pending read', 'between reads']) {
+  test(`stream timeout bounds ${stage} lifetime and releases every resource`, async () => {
+    const r = makeRuntime();
+    const { signal, listeners } = trackedAbortController();
+    const stream = r.window.lumen.stream('numbers', null, { signal, timeoutMs: 27 });
+    let read;
+    if (stage === 'pending read') read = assert.rejects(stream.next(), /Stream timed out/);
+    if (stage === 'between reads') {
+      const item = stream.next(); r.streamFrame({ id: 1, item: 42 }); await item;
+    }
+    const result = assert.rejects(stream.result, error => error.code === 'timeout');
+    assert.equal(r.timers.size, 1);
+    assert.equal([...r.timers.values()][0].delay, 27);
+    r.fireTimer();
+    if (read) await read; else await assert.rejects(stream.next(), /Stream timed out/);
+    await result;
+    assert.equal(r.timers.size, 0);
+    assert.equal(listeners.size, 0);
+    assert.deepEqual(cancelFrames(r), [{ session: SESSION, cancel: 1 }]);
+  });
+}
+
+test('each next and item renews one stream timer rather than retaining a whole-stream deadline', async () => {
+  const r = makeRuntime();
+  const stream = r.window.lumen.stream('numbers', null);
+  const initialTimer = [...r.timers.keys()][0];
+  const first = stream.next();
+  const pendingTimer = [...r.timers.keys()][0];
+  assert.notEqual(pendingTimer, initialTimer);
+  assert.equal(r.timers.size, 1);
+  r.streamFrame({ id: 1, item: 1 }); await first;
+  const idleTimer = [...r.timers.keys()][0];
+  assert.notEqual(idleTimer, pendingTimer);
+  assert.equal([...r.timers.values()][0].delay, 30000);
+  const final = stream.next();
+  assert.notEqual([...r.timers.keys()][0], idleTimer);
+  completeStream(r, 1, null); await final;
+  assert.equal(r.timers.size, 0);
+});
+
+test('stream timeout clamps extremes and uses a finite default', async () => {
+  const r = makeRuntime();
+  for (const [timeoutMs, expected] of [[undefined, 30000], [-5, 1], [900000, 300000], [Infinity, 30000], [NaN, 30000]]) {
+    const stream = r.window.lumen.stream('numbers', null, { timeoutMs });
+    assert.equal([...r.timers.values()][0].delay, expected);
+    await stream.return();
+  }
+  assert.equal(r.timers.size, 0);
+});
+
+test('live streams are limited to 16 and cancelled capacity is reusable', async () => {
+  const r = makeRuntime();
+  const streams = Array.from({ length: 16 }, () => r.window.lumen.stream('numbers', null));
+  const overflow = r.window.lumen.stream('numbers', null);
+  await assert.rejects(overflow.next(), /Too many live streams/);
+  await assert.rejects(overflow.result, /Too many live streams/);
+  assert.equal(r.outbound.length, 16);
+  assert.equal(r.timers.size, 16);
+  await streams[0].return();
+  const replacement = r.window.lumen.stream('numbers', null);
+  assert.equal(r.outbound.at(-1).stream.id, 17);
+  await Promise.all([...streams.slice(1), replacement].map(stream => stream.return()));
+  assert.equal(r.timers.size, 0);
+});
+
+test('combined call and stream capacity is limited to 32 in either registration order', async () => {
+  const r = makeRuntime();
+  const calls = Array.from({ length: 24 }, () => r.window.lumen.call('echo', null));
+  const streams = Array.from({ length: 8 }, () => r.window.lumen.stream('numbers', null));
+  await assert.rejects(r.window.lumen.call('echo', null), /Too many pending calls/);
+  const overflow = r.window.lumen.stream('numbers', null);
+  await assert.rejects(overflow.next(), /Too many pending calls/);
+  assert.equal(r.outbound.length, 32);
+  assert.equal(r.timers.size, 32);
+  r.respond(1, { Ok: null }); await calls[0];
+  const replacement = r.window.lumen.stream('numbers', null);
+  assert.equal(r.outbound.at(-1).stream.id, 33);
+  await streams[0].return();
+  const newCall = r.window.lumen.call('echo', null);
+  assert.equal(r.request().id, 34);
+  for (let id = 2; id <= 24; id++) r.respond(id, { Ok: null });
+  r.respond(34, { Ok: null });
+  await Promise.all([...calls, newCall]);
+  await Promise.all([...streams, replacement].map(stream => stream.return()));
+  assert.equal(r.timers.size, 0);
+});
+
+test('completed unconsumed terminal state does not occupy a live stream slot', async () => {
+  const r = makeRuntime();
+  const completed = [];
+  for (let index = 0; index < 40; index++) {
+    const stream = r.window.lumen.stream('numbers', null);
+    completeStream(r, index + 1, index);
+    completed.push(stream);
+  }
+  assert.equal(r.timers.size, 0);
+  for (let index = 0; index < completed.length; index++) {
+    assert.equal((await completed[index].next()).value, index);
+    assert.equal(await completed[index].result, index);
+  }
+});
+
+for (const pending of [false, true]) {
+  test(`terminal backend errors reject result and ${pending ? 'pending' : 'future'} next with their code`, async () => {
+    const r = makeRuntime();
+    const { signal, listeners } = trackedAbortController();
+    const stream = r.window.lumen.stream('unknown', null, signal);
+    const predicate = error => error.code === 'unknown_method' && error.message === 'No such stream';
+    const read = pending ? assert.rejects(stream.next(), predicate) : undefined;
+    const result = assert.rejects(stream.result, predicate);
+    r.streamFrame({ id: 1, done: true, result: { Err: { code: 'unknown_method', message: 'No such stream' } } });
+    if (read) await read; else await assert.rejects(stream.next(), predicate);
+    await result;
+    assert.equal((await stream.next()).done, true);
+    assert.equal(listeners.size, 0);
+    assert.equal(r.timers.size, 0);
+    assert.equal(cancelFrames(r).length, 0);
+  });
+}
+
+test('code-only terminal errors retain a useful message', async () => {
+  const r = makeRuntime();
+  const stream = r.window.lumen.stream('numbers', null);
+  r.streamFrame({ id: 1, done: true, result: { Err: { code: 'backend' } } });
+  await assert.rejects(stream.result, error => error.code === 'backend' && error.message === 'backend');
+  await assert.rejects(stream.next(), /backend/);
+});
+
+for (const [label, frame] of [
+  ['missing body', { id: 1 }],
+  ['undefined item', { id: 1, item: undefined }],
+  ['item and terminal', { id: 1, item: 1, done: true, result: { Ok: null } }],
+  ['item extra field', { id: 1, item: 1, unexpected: true }],
+  ['false done', { id: 1, done: false, result: { Ok: null } }],
+  ['missing done', { id: 1, result: { Ok: null } }],
+  ['missing result', { id: 1, done: true }],
+  ['extra terminal field', { id: 1, done: true, result: { Ok: null }, unexpected: true }],
+  ['null result', { id: 1, done: true, result: null }],
+  ['empty result', { id: 1, done: true, result: {} }],
+  ['array result', { id: 1, done: true, result: [] }],
+  ['unknown result', { id: 1, done: true, result: { Other: null } }],
+  ['both result tags', { id: 1, done: true, result: { Ok: null, Err: { code: 'backend' } } }],
+  ['undefined success', { id: 1, done: true, result: { Ok: undefined } }],
+  ['null error', { id: 1, done: true, result: { Err: null } }],
+  ['missing code', { id: 1, done: true, result: { Err: {} } }],
+  ['empty code', { id: 1, done: true, result: { Err: { code: '' } } }],
+  ['nonstring message', { id: 1, done: true, result: { Err: { code: 'backend', message: 42 } } }],
+  ['extra error field', { id: 1, done: true, result: { Err: { code: 'backend', unexpected: true } } }],
+]) {
+  test(`malformed matching stream frame rejects and cancels without leaking: ${label}`, async () => {
+    const r = makeRuntime();
+    const { signal, listeners } = trackedAbortController();
+    const stream = r.window.lumen.stream('numbers', null, signal);
+    const read = assert.rejects(stream.next(), isMalformedStream);
+    const result = assert.rejects(stream.result, isMalformedStream);
+    assert.doesNotThrow(() => r.streamFrame(frame));
+    await read; await result;
+    assert.equal((await stream.next()).done, true);
+    assert.equal(listeners.size, 0);
+    assert.equal(r.timers.size, 0);
+    assert.deepEqual(cancelFrames(r), [{ session: SESSION, cancel: 1 }]);
+  });
+}
+
+test('unidentifiable and unknown stream frames are ignored without consuming a read', async () => {
+  const r = makeRuntime();
+  const stream = r.window.lumen.stream('numbers', null);
+  const read = stream.next();
+  for (const frame of [null, undefined, [], false, 12, 'bad', {}, { id: '1' }, { id: 0 }, { id: -1 }, { id: 1.5 }, { id: 99 },
+    { get id() { throw new Error('bad accessor'); } }]) {
+    assert.doesNotThrow(() => r.streamFrame(frame));
+    assert.equal(r.timers.size, 1);
+    assert.equal(cancelFrames(r).length, 0);
+  }
+  r.streamFrame({ id: 1, item: 'valid' });
+  assert.equal((await read).value, 'valid');
+  await stream.return();
+});
+
+for (const pending of [false, true]) {
+  test(`throwing ${pending ? 'item' : 'terminal'} accessor cannot strand a stream`, async () => {
+    const r = makeRuntime();
+    const stream = r.window.lumen.stream('numbers', null);
+    const read = pending ? assert.rejects(stream.next(), isMalformedStream) : undefined;
+    const result = assert.rejects(stream.result, isMalformedStream);
+    const frame = pending ? { id: 1, get item() { throw new Error('invalid accessor'); } } :
+      { id: 1, done: true, get result() { throw new Error('invalid accessor'); } };
+    assert.doesNotThrow(() => r.streamFrame(frame));
+    if (read) await read; else await assert.rejects(stream.next(), isMalformedStream);
+    await result;
+    assert.equal(r.timers.size, 0);
+    assert.equal(cancelFrames(r).length, 1);
+  });
+}
+
+for (const alreadyRead of [false, true]) {
+  test(`${alreadyRead ? 'duplicate' : 'unsolicited'} stream item cancels instead of buffering without credit`, async () => {
+    const r = makeRuntime();
+    const stream = r.window.lumen.stream('numbers', null);
+    if (alreadyRead) {
+      const first = stream.next(); r.streamFrame({ id: 1, item: 1 }); assert.equal((await first).value, 1);
+    }
+    r.streamFrame({ id: 1, item: 'no credit' });
+    await assert.rejects(stream.next(), isMalformedStream);
+    await assert.rejects(stream.result, isMalformedStream);
+    for (let index = 0; index < 1000; index++) r.streamFrame({ id: 1, item: index });
+    assert.equal((await stream.next()).done, true);
+    assert.equal(cancelFrames(r).length, 1);
+    assert.equal(r.timers.size, 0);
+  });
+}
+
+test('late and duplicate stream terminal frames cannot change settled result or another stream', async () => {
+  const r = makeRuntime();
+  const first = r.window.lumen.stream('numbers', null);
+  completeStream(r, 1, 'original');
+  const second = r.window.lumen.stream('numbers', null);
+  const read = second.next();
+  completeStream(r, 1, 'replacement');
+  r.streamFrame({ id: 1, item: 'late' });
+  assert.equal(await first.result, 'original');
+  assert.equal((await first.next()).value, 'original');
+  assert.equal(r.timers.size, 1);
+  completeStream(r, 2, 'second');
+  assert.equal((await read).value, 'second');
+});
+
+test('invalid stream methods and options reject through iterator and result without IPC', async () => {
+  const r = makeRuntime();
+  for (const method of ['', null, undefined, 42, {}, []]) {
+    const stream = r.window.lumen.stream(method, null);
+    await assert.rejects(stream.next(), /Invalid method/);
+    await assert.rejects(stream.result, /Invalid method/);
+  }
+  const invalid = r.window.lumen.stream('numbers', null, { signal: {} });
+  await assert.rejects(invalid.next(), /Invalid abort signal/);
+  await assert.rejects(invalid.result, /Invalid abort signal/);
+  assert.equal(r.timers.size, 0);
+  assert.deepEqual(r.outbound, []);
+});
+
+test('nonserializable stream arguments reject without listener, timer, or capacity leaks', async () => {
+  const r = makeRuntime();
+  const { signal, listeners } = trackedAbortController();
+  const circular = {}; circular.self = circular;
+  for (let index = 0; index < 40; index++) {
+    const stream = r.window.lumen.stream('numbers', circular, signal);
+    await assert.rejects(stream.next(), /circular/i);
+    await assert.rejects(stream.result, /circular/i);
+  }
+  assert.equal(r.timers.size, 0);
+  assert.equal(listeners.size, 0);
+  assert.deepEqual(r.outbound, []);
+});
+
+test('stream registration transport failures cannot leak capacity or abort listeners', async () => {
+  const r = makeRuntime({ throwTransport: true });
+  const { signal, listeners } = trackedAbortController();
+  for (let index = 0; index < 40; index++) {
+    const stream = r.window.lumen.stream('numbers', null, signal);
+    await assert.rejects(stream.next(), /mock transport unavailable/);
+    await assert.rejects(stream.result, /mock transport unavailable/);
+  }
+  assert.equal(r.timers.size, 0);
+  assert.equal(listeners.size, 0);
+  assert.deepEqual(r.outbound, []);
+});
+
+test('navigation during stream argument serialization prevents registration', async () => {
+  const r = makeRuntime();
+  const stream = r.window.lumen.stream('numbers', { toJSON() { r.pagehide(); return null; } });
+  await assert.rejects(stream.next(), /Page session ended/);
+  await assert.rejects(stream.result, /Page session ended/);
+  assert.deepEqual(r.outbound, []);
+  assert.equal(r.timers.size, 0);
+});
+
+test('reentrant argument serialization cannot exceed the combined capacity bound', async () => {
+  const r = makeRuntime();
+  const calls = [];
+  const stream = r.window.lumen.stream('numbers', { toJSON() {
+    for (let index = 0; index < 32; index++) calls.push(r.window.lumen.call('echo', null));
+    return null;
+  } });
+  await assert.rejects(stream.next(), /Too many pending calls/);
+  assert.equal(r.outbound.length, 32);
+  assert.equal(r.timers.size, 32);
+  for (const frame of r.outbound) r.respond(frame.request.id, { Ok: null });
+  await Promise.all(calls);
+  assert.equal(r.timers.size, 0);
+});
+
+test('reentrant call serialization cannot exceed combined capacity with streams', async () => {
+  const r = makeRuntime();
+  const calls = Array.from({ length: 16 }, () => r.window.lumen.call('echo', null));
+  const streams = [];
+  const overflow = r.window.lumen.call('echo', { toJSON() {
+    for (let index = 0; index < 16; index++) streams.push(r.window.lumen.stream('numbers', null));
+    return null;
+  } });
+  await assert.rejects(overflow, /Too many pending calls/);
+  assert.equal(r.outbound.length, 32);
+  for (let id = 1; id <= 16; id++) r.respond(id, { Ok: null });
+  await Promise.all(calls);
+  await Promise.all(streams.map(stream => stream.return()));
+  assert.equal(r.timers.size, 0);
+});
+
+test('pull transport failure rejects read and result and removes the live stream', async () => {
+  const r = makeRuntime({ throwTransportAt: 2 });
+  const { signal, listeners } = trackedAbortController();
+  const stream = r.window.lumen.stream('numbers', null, signal);
+  await assert.rejects(stream.next(), /mock transport unavailable/);
+  await assert.rejects(stream.result, /mock transport unavailable/);
+  assert.deepEqual(r.outbound, [
+    { session: SESSION, stream: { id: 1, method: 'numbers', args: null } },
+    { session: SESSION, cancel: 1 },
+  ]);
+  assert.equal(listeners.size, 0);
+  assert.equal(r.timers.size, 0);
+  assert.equal((await stream.next()).done, true);
+});
+
+test('cancellation transport failure never strands pending reads or cleanup', async () => {
+  const r = makeRuntime({ throwTransportAt: 3 });
+  const { signal, listeners } = trackedAbortController();
+  const stream = r.window.lumen.stream('numbers', null, signal);
+  const next = stream.next();
+  await stream.return();
+  assert.equal((await next).done, true);
+  await assert.rejects(stream.result, isCancelled);
+  assert.equal(listeners.size, 0);
+  assert.equal(r.timers.size, 0);
+});
+
+test('return after successful completion leaves result fulfilled and sends no cancellation', async () => {
+  const r = makeRuntime();
+  const { controller, signal, listeners } = trackedAbortController();
+  const stream = r.window.lumen.stream('numbers', null, signal);
+  const next = stream.next();
+  completeStream(r, 1, false);
+  assert.equal((await next).value, false);
+  await stream.return('discarded'); controller.abort();
+  assert.equal(await stream.result, false);
+  assert.equal(cancelFrames(r).length, 0);
+  assert.equal(r.timers.size, 0);
+  assert.equal(listeners.size, 0);
+});
+
+test('reentrant stream serialization cannot bypass the 16-stream bound', async () => {
+  const r = makeRuntime();
+  const streams = [];
+  const overflow = r.window.lumen.stream('numbers', { toJSON() {
+    for (let index = 0; index < 16; index++) streams.push(r.window.lumen.stream('numbers', null));
+    return null;
+  } });
+  await assert.rejects(overflow.next(), /Too many live streams/);
+  await assert.rejects(overflow.result, /Too many live streams/);
+  assert.equal(r.outbound.length, 16);
+  assert.equal(r.timers.size, 16);
+  await Promise.all(streams.map(stream => stream.return()));
+  assert.equal(r.timers.size, 0);
+});
+
+test('navigation during call serialization prevents an otherwise-valid late call', async () => {
+  const r = makeRuntime();
+  await assert.rejects(r.window.lumen.call('echo', { toJSON() { r.pagehide(); return null; } }), /Page session ended/);
+  assert.equal(r.timers.size, 0);
+  assert.deepEqual(r.outbound, []);
+});
+
+test('shared Rust-host wire fixture delivers items and final result with one credit per frame', async () => {
+  const frames = JSON.parse(await readFile(new URL('../crates/lumendesk/tests/stream-frames.json', import.meta.url), 'utf8'));
+  const r = makeRuntime();
+  const stream = r.window.lumen.stream('numbers', { count: 3 });
+  const received = [];
+  let resultSettled = false;
+  stream.result.then(() => { resultSettled = true; });
+  for (const [index, frame] of frames.entries()) {
+    assert.equal(resultSettled, false, 'final result stays pending until the host terminal frame');
+    const next = stream.next();
+    assert.equal(pullFrames(r).length, index + 1);
+    assert.deepEqual(pullFrames(r).at(-1), { session: SESSION, pull: frame.id });
+    r.streamFrame(frame);
+    const response = await next;
+    if ('item' in frame) {
+      assert.deepEqual(normalized(response), { done: false, value: frame.item });
+      received.push(response.value);
+    } else {
+      assert.deepEqual(normalized(response), { done: true, value: frame.result.Ok });
+      assert.equal(await stream.result, frame.result.Ok);
+    }
+  }
+  assert.deepEqual(received, [0, 1, 2]);
+  assert.equal(await stream.result, 3);
+  assert.equal(resultSettled, true);
+  assert.equal((await stream.next()).done, true);
+  assert.equal(pullFrames(r).length, frames.length);
+  assert.equal(cancelFrames(r).length, 0);
+  assert.equal(r.timers.size, 0);
+});
+
+test('host lifetime ceiling rejects a pending read even with a longer frontend timeout', async () => {
+  const r = makeRuntime();
+  const { controller, signal, listeners } = trackedAbortController();
+  const stream = r.window.lumen.stream('slow', null, { signal, timeoutMs: 300000 });
+  const predicate = error => error.code === 'backend' && /60s/.test(error.message);
+  const next = assert.rejects(stream.next(), predicate);
+  const result = assert.rejects(stream.result, predicate);
+  assert.equal([...r.timers.values()][0].delay, 300000);
+  r.streamFrame({ id: 1, done: true, result: { Err: { code: 'backend', message: 'Stream exceeded the host 60s lifetime cap' } } });
+  await next; await result;
+  assert.equal((await stream.next()).done, true);
+  assert.equal(r.timers.size, 0);
+  assert.equal(listeners.size, 0);
+  controller.abort();
+  assert.equal(cancelFrames(r).length, 0, 'host terminal errors need no duplicate cancellation');
+});
+
+for (const outerKind of ['call', 'stream']) {
+  for (const innerKind of ['call', 'stream']) {
+    test(`reentrant ${outerKind} arguments keep ${innerKind} request IDs in transport order`, async () => {
+      const r = makeRuntime();
+      let inner;
+      let serializations = 0;
+      const outer = r.window.lumen[outerKind]('outer', {
+        toJSON() {
+          serializations++;
+          inner = r.window.lumen[innerKind]('inner', null);
+          return 'outer payload';
+        },
+      });
+      const requests = r.outbound.map(frame => frame.request || frame.stream);
+      // Settle everything even on the old, invalid ordering so this assertion
+      // measures admission order rather than leaving unresolved test work.
+      for (const frame of r.outbound.slice()) {
+        if (frame.request) r.respond(frame.request.id, { Ok: frame.request.method });
+        else completeStream(r, frame.stream.id, frame.stream.method);
+      }
+      assert.equal(await (innerKind === 'call' ? inner : inner.result), 'inner');
+      assert.equal(await (outerKind === 'call' ? outer : outer.result), 'outer');
+      assert.deepEqual(requests.map(request => request.id), [1, 2]);
+      assert.deepEqual(requests.map(request => request.method), ['inner', 'outer']);
+      assert.equal(requests[1].args, 'outer payload');
+      assert.equal(serializations, 1);
+      assert.equal(r.timers.size, 0);
+    });
+  }
+}
+
+test('delayed Rust delivery scripts cannot settle work or emit events in a replacement page', async () => {
+  const fixture = JSON.parse(await readFile(new URL('../crates/lumendesk/tests/session-delivery.json', import.meta.url), 'utf8'));
+  const r = makeRuntime({ session: 'replacement-page-session' });
+  const events = [];
+  r.window.lumen.on('changed', value => events.push(value));
+  const call = r.window.lumen.call('new_page_call', null);
+  const stream = r.window.lumen.stream('new_page_stream', null);
+  const read = stream.next();
+  let callSettled = false;
+  let readSettled = false;
+  call.then(() => { callSettled = true; });
+  read.then(() => { readSettled = true; });
+  for (const script of fixture.scripts) r.evaluate(script);
+  await Promise.resolve();
+  assert.equal(callSettled, false);
+  assert.equal(readSettled, false);
+  assert.deepEqual(events, []);
+  assert.equal(r.timers.size, 2);
+  r.respond(1, { Ok: 'new call' });
+  r.streamFrame({ id: 2, item: 'new item' });
+  completeStream(r, 2, 'new result');
+  r.emit('changed', 'new event');
+  assert.equal(await call, 'new call');
+  assert.deepEqual(normalized(await read), { done: false, value: 'new item' });
+  assert.equal(await stream.result, 'new result');
+  assert.deepEqual(events, ['new event']);
+  assert.equal(r.timers.size, 0);
+});
+
+test('Rust delivery scripts preserve JSON __proto__ keys as data for calls, streams and events', async () => {
+  const fixture = JSON.parse(await readFile(new URL('../crates/lumendesk/tests/session-delivery.json', import.meta.url), 'utf8'));
+  const r = makeRuntime({ session: fixture.session });
+  const events = [];
+  r.window.lumen.on('changed', value => events.push(value));
+  const call = r.window.lumen.call('json_call', null);
+  const stream = r.window.lumen.stream('json_stream', null);
+  const read = stream.next();
+  for (const script of fixture.scripts) r.evaluate(script);
+  completeStream(r, 2, null);
+  const values = [await call, (await read).value, events[0]];
+  await stream.result;
+  for (const value of values) {
+    assert.deepEqual(normalized(value), fixture.payload);
+    assert.equal(Object.prototype.hasOwnProperty.call(value, '__proto__'), true);
+    assert.equal(Object.prototype.hasOwnProperty.call(value.nested, '__proto__'), true);
+    assert.equal(value.trusted, undefined);
+    assert.equal(value.nested.role, undefined);
+  }
+  assert.equal(r.timers.size, 0);
+});
+
+for (const outerKind of ['call', 'stream']) {
+  for (const hook of ['listener', 'aborted getter']) {
+    test(`${outerKind} request IDs remain ordered when an abort ${hook} submits nested work`, async () => {
+      const r = makeRuntime();
+      const controller = new AbortController();
+      const signal = controller.signal;
+      let inner;
+      let serialized = false;
+      const submit = () => { if (!inner) inner = r.window.lumen.call('inner', null); };
+      if (hook === 'listener') {
+        const add = signal.addEventListener.bind(signal);
+        signal.addEventListener = (...args) => { submit(); return add(...args); };
+      } else {
+        Object.defineProperty(signal, 'aborted', {
+          get() { if (serialized) submit(); return false; },
+        });
+      }
+      const outer = r.window.lumen[outerKind]('outer', {
+        toJSON() { serialized = true; return 'outer payload'; },
+      }, signal);
+      const requests = r.outbound.map(frame => frame.request || frame.stream);
+      for (const frame of r.outbound.slice()) {
+        if (frame.request) r.respond(frame.request.id, { Ok: frame.request.method });
+        else completeStream(r, frame.stream.id, frame.stream.method);
+      }
+      assert.equal(await inner, 'inner');
+      assert.equal(await (outerKind === 'call' ? outer : outer.result), 'outer');
+      assert.deepEqual(requests.map(request => request.id), [1, 2]);
+      assert.equal(r.timers.size, 0);
+    });
+  }
+}

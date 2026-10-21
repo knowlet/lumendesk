@@ -1,2 +1,6 @@
+    Checking lumendesk-core v0.1.0 (/workspace/scratch/c7703109bdb3/rust-desktop-cleanroom/crates/lumendesk-core)
+    Checking xattr v1.6.1
+    Checking tar v0.4.46
     Checking lumendesk v0.1.0 (/workspace/scratch/c7703109bdb3/rust-desktop-cleanroom/crates/lumendesk)
-    Finished `dev` profile [unoptimized] target(s) in 0.40s
+    Checking lumendesk-cli v0.1.0 (/workspace/scratch/c7703109bdb3/rust-desktop-cleanroom/crates/lumendesk-cli)
+    Finished `dev` profile [unoptimized] target(s) in 1.30s

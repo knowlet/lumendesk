@@ -21,6 +21,16 @@ pub(crate) fn compile(
     release: bool,
     offline: bool,
 ) -> Result<PathBuf> {
+    compile_for_target(project, config, release, offline, None)
+}
+
+pub(crate) fn compile_for_target(
+    project: &Path,
+    config: &Config,
+    release: bool,
+    offline: bool,
+    target: Option<&str>,
+) -> Result<PathBuf> {
     let manifest = project.join(&config.build.manifest);
     if !manifest.is_file() {
         return Err(format!(
@@ -40,6 +50,9 @@ pub(crate) fn compile(
         ])
         .stdin(Stdio::null())
         .stderr(Stdio::inherit());
+    if let Some(target) = target {
+        command.args(["--target", target]);
+    }
     if release {
         command.arg("--release");
     } else {

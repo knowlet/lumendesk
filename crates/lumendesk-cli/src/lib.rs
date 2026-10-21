@@ -2,7 +2,9 @@
 mod build;
 mod config;
 mod doctor;
+mod license_overrides;
 mod output;
+mod package;
 mod scaffold;
 mod typescript;
 
@@ -20,6 +22,7 @@ Usage:
   lumendesk new NAME [--mode native|web] [--sdk-path PATH]
   lumendesk doctor [--mode native|web] [--project DIR]
   lumendesk build [--project DIR] [--offline]
+  lumendesk package --kind source|binary --out FILE.tar.gz [--project DIR] [--offline]
   lumendesk dev [--project DIR] [--offline] [--once] [--poll-ms 500]
   lumendesk bindings [--project DIR] [--schema FILE] [--out FILE]
   lumendesk bindings --sample [--out FILE]
@@ -30,7 +33,8 @@ dev rebuilds source changes, preserving the running app on compiler failure. It 
 and waits for the old child before starting a successfully built replacement.
 --once builds, launches once, and waits for that app to exit. Ctrl-C stops the app.
 bindings --sample prints a sample client unless --out is given.
-Packaging, signing, publishing, and cross-compilation are outside this milestone.";
+package creates a portable archive with checksums and dependency/runtime notes.
+Installers, signing, publishing, and cross-compilation are outside this milestone.";
 
 struct Arguments {
     values: Vec<String>,
@@ -160,6 +164,20 @@ pub fn run(args: impl IntoIterator<Item = String>) -> Result<()> {
             } else {
                 build::develop(&project, config, once, offline, poll)
             }
+        }
+        "package" => {
+            let project = PathBuf::from(args.value("--project")?.unwrap_or_else(|| ".".into()));
+            let kind =
+                package::Kind::parse(&args.value("--kind")?.unwrap_or_else(|| "source".into()))?;
+            let output = PathBuf::from(
+                args.value("--out")?
+                    .ok_or("package requires --out FILE.tar.gz")?,
+            );
+            let offline = args.flag("--offline");
+            args.finish()?;
+            package::create(&project, kind, &output, offline)?;
+            println!("Portable archive: {}", output.display());
+            Ok(())
         }
         "bindings" => {
             let project = PathBuf::from(args.value("--project")?.unwrap_or_else(|| ".".into()));

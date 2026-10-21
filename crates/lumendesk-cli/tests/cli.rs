@@ -502,3 +502,43 @@ fn bindings_default_project_path_replaces_existing_generated_file() {
         generate_typescript(&sample_schema()).unwrap()
     );
 }
+
+#[test]
+fn bindings_accept_runtime_stream_registry_and_validate_names() {
+    let temp = Temp::new();
+    let source = include_str!("../../lumendesk-core/tests/typescript/schema.json");
+    let schema = temp.join("schema.json");
+    fs::write(&schema, source).unwrap();
+    let result = cli(&["bindings", "--schema", schema.to_str().unwrap()]);
+    assert!(result.status.success(), "{}", text(&result));
+    let registry: lumendesk_core::SchemaRegistry = serde_json::from_str(source).unwrap();
+    assert_eq!(
+        String::from_utf8(result.stdout).unwrap(),
+        registry.typescript()
+    );
+    let mut value: serde_json::Value = serde_json::from_str(source).unwrap();
+    let streams = value["streams"].as_object_mut().unwrap();
+    let key = streams.keys().next().unwrap().clone();
+    streams.get_mut(&key).unwrap()["name"] = "different".into();
+    assert!(
+        generate_typescript(&value)
+            .unwrap_err()
+            .contains("does not match")
+    );
+    let mut duplicate: serde_json::Value = serde_json::from_str(source).unwrap();
+    let mut stream = duplicate["streams"]
+        .as_object()
+        .unwrap()
+        .values()
+        .next()
+        .unwrap()
+        .clone();
+    stream["name"] = "inspect".into();
+    duplicate["streams"]["inspect"] = stream;
+    assert!(generate_typescript(&duplicate).is_err());
+    let mut malformed: serde_json::Value = serde_json::from_str(source).unwrap();
+    malformed["streams"] = serde_json::json!({"broken": {"name": "broken"}});
+    assert!(generate_typescript(&malformed).is_err());
+    let empty = serde_json::to_value(lumendesk_core::SchemaRegistry::default()).unwrap();
+    assert!(generate_typescript(&empty).is_ok());
+}

@@ -1,0 +1,19 @@
+{
+  "session": "previous-page-session",
+  "payload": {
+    "__proto__": {
+      "trusted": true
+    },
+    "nested": {
+      "__proto__": {
+        "role": "admin"
+      }
+    },
+    "text": "quote: \"; line: \n; Unicode: 測試"
+  },
+  "scripts": [
+    "window.__lumenResponse && window.__lumenResponse(\"previous-page-session\",JSON.parse(\"{\\\"id\\\":1,\\\"result\\\":{\\\"Ok\\\":{\\\"__proto__\\\":{\\\"trusted\\\":true},\\\"nested\\\":{\\\"__proto__\\\":{\\\"role\\\":\\\"admin\\\"}},\\\"text\\\":\\\"quote: \\\\\\\"; line: \\\\n; Unicode: 測試\\\"}}}\"));",
+    "window.__lumenStream && window.__lumenStream(\"previous-page-session\",JSON.parse(\"{\\\"id\\\":2,\\\"item\\\":{\\\"__proto__\\\":{\\\"trusted\\\":true},\\\"nested\\\":{\\\"__proto__\\\":{\\\"role\\\":\\\"admin\\\"}},\\\"text\\\":\\\"quote: \\\\\\\"; line: \\\\n; Unicode: 測試\\\"}}\"));",
+    "window.__lumenEvent && window.__lumenEvent(\"previous-page-session\",\"changed\",JSON.parse(\"{\\\"__proto__\\\":{\\\"trusted\\\":true},\\\"nested\\\":{\\\"__proto__\\\":{\\\"role\\\":\\\"admin\\\"}},\\\"text\\\":\\\"quote: \\\\\\\"; line: \\\\n; Unicode: 測試\\\"}\"));"
+  ]
+}

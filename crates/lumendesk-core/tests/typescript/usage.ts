@@ -53,3 +53,27 @@ client.call('inspect', args).then(result => { const wrong: string = result[0].id
 const wrongEvent: Events['changed'] = { name: 'Orion', revision: 'one' };
 void positiveCases;
 void wrongEvent;
+
+async function streamCases() {
+  const stream = client.stream('count', 20, new AbortController().signal);
+  for await (const item of stream) {
+    const count: number = item;
+    void count;
+  }
+  const summary: string = await stream.result;
+  const nullable = client.stream('nullable-item', null);
+  for await (const item of nullable) { const name: string | null = item; void name; }
+  const ok: boolean = await nullable.result;
+  void [summary, ok];
+}
+// @ts-expect-error Streaming method names are distinct from ordinary calls.
+client.stream('no-args', null);
+// @ts-expect-error Ordinary calls cannot invoke streaming methods.
+client.call('count', 1);
+// @ts-expect-error Streaming arguments use their declared type.
+client.stream('count', 'twenty');
+// @ts-expect-error Terminal stream results are typed independently of items.
+client.stream('count', 1).result.then(result => { const wrong: number = result; void wrong; });
+// @ts-expect-error Nullable items preserve their declared type.
+client.stream('nullable-item', null).next().then(item => { if (!item.done) { const wrong: number = item.value; void wrong; } });
+void streamCases;

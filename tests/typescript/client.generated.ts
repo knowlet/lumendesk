@@ -4,10 +4,16 @@ export type JsonValue = null | boolean | number | string | JsonValue[] | { [key:
 export interface Methods {
   "greet": { args: { "enthusiastic": boolean; "name": string; }; result: { "enthusiastic": boolean; "greeting": string; "name": string; "submissions": number; } };
 }
+export interface StreamMethods {
+}
 export interface Events {
   "greeting": { "enthusiastic": boolean; "greeting": string; "name": string; "submissions": number; };
 }
+export interface CallStream<T, R> extends AsyncIterableIterator<T> {
+  readonly result: Promise<R>;
+}
 export interface Client {
   call<K extends keyof Methods>(method: K, args: Methods[K]['args'], signal?: AbortSignal): Promise<Methods[K]['result']>;
+  stream<K extends keyof StreamMethods>(method: K, args: StreamMethods[K]['args'], signal?: AbortSignal): CallStream<StreamMethods[K]['item'], StreamMethods[K]['result']>;
   on<K extends keyof Events>(event: K, listener: (payload: Events[K]) => void, options?: { once?: boolean }): () => void;
 }

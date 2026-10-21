@@ -11,13 +11,13 @@ pub mod schema;
 pub mod stream;
 
 pub use bridge::{
-    Authorization, Bridge, BridgeConfig, CallContext, CallRequest, CallResponse, CancellationToken,
-    SessionToken, TrustedOrigin,
+    Authorization, Bridge, BridgeConfig, BridgeStreamReceiver, CallContext, CallRequest,
+    CallResponse, CancellationToken, SessionToken, StreamCall, StreamResponseItem, TrustedOrigin,
 };
 pub use events::{Event, EventBus, ListenerId};
-pub use schema::{Field, MethodSchema, Schema, SchemaRegistry};
+pub use schema::{Field, MethodSchema, Schema, SchemaRegistry, StreamMethodSchema};
 use serde::{Deserialize, Serialize};
-pub use stream::{StreamItem, StreamReceiver, StreamSender, bounded_stream};
+pub use stream::{StreamItem, StreamReceiver, StreamSender, StreamSink, bounded_stream};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]

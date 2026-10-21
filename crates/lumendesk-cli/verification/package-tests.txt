@@ -1,0 +1,57 @@
+   Compiling lumendesk-cli v0.1.0 (/workspace/scratch/c7703109bdb3/rust-desktop-cleanroom/crates/lumendesk-cli)
+    Finished `test` profile [unoptimized] target(s) in 0.40s
+     Running unittests src/lib.rs (target/debug/deps/lumendesk_cli-1107b27c64482d85)
+
+running 2 tests
+test package::tests::archive_paths_are_portable_and_cannot_escape ... ok
+test package::tests::source_filter_is_an_allowlist_with_sensitive_name_exclusions ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/lumendesk-2980742c841094ed)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli.rs (target/debug/deps/cli-fb6f69fb26227370)
+
+running 16 tests
+test destination_symlink_is_rejected ... ok
+test config_rejects_unknown_fields_unsupported_versions_and_escaping_paths ... ok
+test bindings_default_project_path_replaces_existing_generated_file ... ok
+test doctor_reports_missing_tools_without_claiming_success ... ok
+test explicit_bindings_output_rejects_symlinks_and_replaces_hardlinks_safely ... ok
+test populated_destination_is_preserved_exactly ... ok
+test invalid_names_modes_and_sdk_fail_before_creating_files ... ok
+test configured_bindings_reject_symlink_files_and_directories_without_touching_external_data ... ok
+test bindings_are_deterministic_and_validate_registry ... ok
+test scaffolds_both_modes_in_fresh_and_empty_directories ... ok
+test missing_cargo_and_malformed_schema_are_actionable_failures ... ok
+test help_version_unknown_commands_and_missing_config ... ok
+test doctor_rejects_old_rust_compiler ... ok
+test release_build_produces_real_executable ... ok
+test dev_once_sets_separate_identity_and_propagates_app_failure ... ok
+test dev_preserves_working_process_on_failure_then_releases_resources_before_swap ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s
+
+     Running tests/package.rs (target/debug/deps/package-df76a091c76bd037)
+
+running 7 tests
+test real_web_source_archive_builds_and_retains_sdk_test_fixtures ... ignored, requires configured WebKit/GTK development libraries and cached dependencies
+test hardlink_inputs_and_cross_platform_path_escapes_fail_closed ... ok
+test input_links_and_output_symlink_components_are_rejected ... ok
+test unsupported_local_dependencies_and_configured_escape_fail ... ok
+test source_is_deterministic_checksummed_and_excludes_secrets_and_caches ... ok
+test source_rebuilds_after_original_app_and_sdk_are_removed ... ok
+test binary_archive_contains_a_real_host_executable_and_runtime_notes ... ok
+
+test result: ok. 6 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+   Doc-tests lumendesk_cli
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

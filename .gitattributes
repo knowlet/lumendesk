@@ -1,0 +1,2 @@
+# Keep generated fixtures, embedded assets and scripts byte-stable across platforms.
+* text=auto eol=lf
