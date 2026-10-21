@@ -84,6 +84,54 @@ fn entries(path: &Path) -> BTreeMap<String, Vec<u8>> {
         })
         .collect()
 }
+#[test]
+fn source_archive_rejects_excluded_rust_module_candidates() {
+    for module in [
+        "cache/mod.rs",
+        "build/mod.rs",
+        "vendor/mod.rs",
+        "password.rs",
+        "credentials.rs",
+        "secrets.rs",
+    ] {
+        let temp = Temp::new();
+        let app = fixture(&temp);
+        let name = module.split(['/', '.']).next().unwrap();
+        let source = app.join("src").join(module);
+        fs::create_dir_all(source.parent().unwrap()).unwrap();
+        fs::write(source, "pub fn run() {}\n").unwrap();
+        fs::write(
+            app.join("src/main.rs"),
+            format!("mod {name}; fn main() {{ {name}::run(); }}\n"),
+        )
+        .unwrap();
+        let build = Command::new("cargo")
+            .current_dir(&app)
+            .args(["check", "--offline"])
+            .output()
+            .unwrap();
+        assert!(build.status.success(), "{}", text(&build));
+        let archive = temp.join("source.tar.gz");
+        let output = package(&app, &archive, "source");
+        assert!(
+            !output.status.success(),
+            "silently omitted {module}: {}",
+            text(&output)
+        );
+        assert!(
+            text(&output).contains("excluded compilation-source candidate"),
+            "{}",
+            text(&output)
+        );
+        assert!(
+            text(&output).contains(&format!("src/{name}")),
+            "{}",
+            text(&output)
+        );
+        assert!(!archive.exists());
+    }
+}
+
 fn verify_manifest(files: &BTreeMap<String, Vec<u8>>) -> serde_json::Value {
     let manifest: serde_json::Value = serde_json::from_slice(&files["MANIFEST.json"]).unwrap();
     let records = manifest["files"].as_array().unwrap();
@@ -113,7 +161,7 @@ fn source_is_deterministic_checksummed_and_excludes_secrets_and_caches() {
         ("node_modules/a/index.js", "SECRET_NODE"),
         ("web/credentials.json", "SECRET_CREDENTIALS"),
         ("web/private.pem", "SECRET_KEY"),
-        ("src/.private/data.rs", "SECRET_HIDDEN"),
+        ("web/.private/data.rs", "SECRET_HIDDEN"),
         ("web/config.secret.json", "SECRET_NESTED"),
         ("web/index.html", "<h1>Public</h1>"),
     ] {

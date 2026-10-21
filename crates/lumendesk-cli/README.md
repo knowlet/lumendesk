@@ -195,6 +195,13 @@ The source allowlist is deliberately bounded:
   `node_modules`, existing vendor trees, key/certificate files, or names containing
   secret/credential/password components
 
+Excluded entries encountered under `src/`, and excluded `.rs` entries in traversed
+source directories, fail packaging with their path instead of silently dropping
+possible Rust modules. This conservative check also rejects unused excluded entries
+under `src/`; move private data out of that source tree or rename legitimate modules
+before packaging. Excluded contents are never read or included. It is not a Rust
+module parser and does not prove every implicit source/resource reference is bundled.
+
 Unknown root files and file extensions are omitted. Declared Cargo source/readme/
 license/build paths must be present in the allowlist. Embedded `include_str!` or
 `include_bytes!` dependencies outside this layout need restructuring first. The

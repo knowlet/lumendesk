@@ -601,10 +601,20 @@ fn collect(root: &Path, relative: &Path, prefix: &str, files: &mut Files) -> Res
             .into_string()
             .map_err(|_| "package filenames must be Unicode")?;
         safe_relative(&name)?;
+        let child = relative.join(&name);
         if excluded(&name) {
+            // Never read excluded inputs or silently produce an incomplete Rust
+            // source tree. This is deliberately conservative, not a module parser.
+            if child.starts_with("src") || child.extension().is_some_and(|ext| ext == "rs") {
+                return Err(format!(
+                    "excluded compilation-source candidate: {}; restructure the source tree to avoid excluded names before packaging",
+                    child
+                        .to_string_lossy()
+                        .replace(std::path::MAIN_SEPARATOR, "/")
+                ));
+            }
             continue;
         }
-        let child = relative.join(&name);
         let info = fs::symlink_metadata(entry.path()).map_err(|e| e.to_string())?;
         let included_dir = !relative.as_os_str().is_empty()
             || matches!(
@@ -1830,6 +1840,43 @@ mod tests {
         insert(&mut files, "src/other.rs", b"other".to_vec(), 0o644).unwrap();
         assert_eq!(files["src/main.rs"].bytes, b"rewritten");
     }
+    #[test]
+    fn excluded_source_candidates_fail_without_reading_or_including_them() {
+        for path in [
+            "src/.private/data.rs",
+            "src/secret.json",
+            "examples/password.rs",
+            "tests/credentials.rs",
+            "password.rs",
+        ] {
+            let fixture = Fixture::new();
+            fixture.write(path, b"PRIVATE_CONTENT");
+            let mut files = Files::new();
+            let error = collect(&fixture.0, Path::new(""), "", &mut files).unwrap_err();
+            assert!(
+                error.contains("excluded compilation-source candidate"),
+                "{error}"
+            );
+            assert!(!error.contains("PRIVATE_CONTENT"));
+            assert!(files.is_empty());
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn excluded_source_links_are_rejected_without_following_them() {
+        let fixture = Fixture::new();
+        fs::create_dir(fixture.0.join("src")).unwrap();
+        std::os::unix::fs::symlink("missing-target", fixture.0.join("src/cache")).unwrap();
+        let mut files = Files::new();
+        assert!(
+            collect(&fixture.0, Path::new(""), "", &mut files)
+                .unwrap_err()
+                .contains("excluded compilation-source candidate")
+        );
+        assert!(files.is_empty());
+    }
+
     #[test]
     fn source_filter_is_an_allowlist_with_sensitive_name_exclusions() {
         for path in [
