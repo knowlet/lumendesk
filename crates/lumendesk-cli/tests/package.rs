@@ -157,7 +157,13 @@ fn source_rebuilds_after_original_app_and_sdk_are_removed() {
     fs::create_dir_all(sdk.join("assets")).unwrap();
     fs::write(sdk.join("Cargo.toml"), "[workspace]\nmembers=[\"crates/lumendesk\",\"crates/lumendesk-core\"]\nresolver=\"3\"\n[workspace.package]\nversion=\"0.1.0\"\nedition=\"2024\"\nlicense=\"MIT OR Apache-2.0\"\nrust-version=\"1.95\"\n").unwrap();
     fs::write(sdk.join("LICENSE-MIT"), "fixture SDK MIT notice").unwrap();
+    fs::write(app.join("LICENSE-MIT"), "different application MIT notice").unwrap();
     fs::write(sdk.join("LICENSE-APACHE"), "fixture SDK Apache notice").unwrap();
+    fs::write(
+        sdk.join("crates/lumendesk-core/LICENSE-MIT"),
+        "crate-specific core notice",
+    )
+    .unwrap();
     fs::write(sdk.join("assets/message.txt"), "bundled-sdk-asset").unwrap();
     fs::create_dir(app.join("assets")).unwrap();
     fs::write(app.join("assets/message.txt"), "separate-app-asset").unwrap();
@@ -229,6 +235,19 @@ fn source_rebuilds_after_original_app_and_sdk_are_removed() {
     assert!(result.status.success(), "{}", text(&result));
     let second = entries(&repacked);
     verify_manifest(&second);
+    let notice = "dependency-licenses/lumendesk-0.1.0/LICENSE-MIT";
+    assert_eq!(files[notice], b"fixture SDK MIT notice");
+    assert_eq!(second[notice], files[notice]);
+    let binary = temp.join("repacked-binary.tar.gz");
+    let result = package(&extracted, &binary, "binary");
+    assert!(result.status.success(), "{}", text(&result));
+    let binary_files = entries(&binary);
+    verify_manifest(&binary_files);
+    assert_eq!(binary_files[notice], files[notice]);
+    let core_notice = "dependency-licenses/lumendesk-core-0.1.0/LICENSE-MIT";
+    for archive in [&files, &second, &binary_files] {
+        assert_eq!(archive[core_notice], b"crate-specific core notice");
+    }
     assert_eq!(
         second.get("assets/message.txt"),
         files.get("assets/message.txt")
@@ -768,4 +787,137 @@ fn source_preserves_effective_workspace_resolver() {
             text(&build)
         );
     }
+}
+
+#[test]
+fn source_preserves_outer_workspace_release_profile() {
+    let temp = Temp::new();
+    let app = fixture(&temp);
+    let manifest = fs::read_to_string(app.join("Cargo.toml"))
+        .unwrap()
+        .replace("[workspace]\n", "");
+    fs::write(app.join("Cargo.toml"), manifest).unwrap();
+    fs::write(temp.join("Cargo.toml"), "[workspace]\nmembers=[\"app\"]\nresolver=\"3\"\n[profile.release]\noverflow-checks=true\n[profile.release.package.package-fixture]\nopt-level=1\n[profile.custom]\ninherits=\"release\"\ndebug=true\n").unwrap();
+    fs::write(
+        app.join("src/main.rs"),
+        "fn main() { println!(\"{}\", std::hint::black_box(u8::MAX) + 1); }\n",
+    )
+    .unwrap();
+    let original = Command::new("cargo")
+        .args(["run", "--release", "--offline"])
+        .current_dir(&app)
+        .output()
+        .unwrap();
+    assert!(!original.status.success(), "{}", text(&original));
+    assert!(text(&original).contains("overflow"), "{}", text(&original));
+    let archive = temp.join("profile.tar.gz");
+    let result = package(&app, &archive, "source");
+    assert!(result.status.success(), "{}", text(&result));
+    let files = entries(&archive);
+    let rewritten: toml::Value =
+        toml::from_str(std::str::from_utf8(&files["Cargo.toml"]).unwrap()).unwrap();
+    let original_manifest: toml::Value =
+        toml::from_str(&fs::read_to_string(temp.join("Cargo.toml")).unwrap()).unwrap();
+    assert_eq!(rewritten.get("profile"), original_manifest.get("profile"));
+    let relocated = temp.join("relocated");
+    fs::create_dir(&relocated).unwrap();
+    tar::Archive::new(GzDecoder::new(fs::File::open(&archive).unwrap()))
+        .unpack(&relocated)
+        .unwrap();
+    let rebuilt = Command::new("cargo")
+        .args(["run", "--release", "--offline", "--locked"])
+        .current_dir(&relocated)
+        .output()
+        .unwrap();
+    assert!(!rebuilt.status.success(), "{}", text(&rebuilt));
+    assert!(text(&rebuilt).contains("overflow"), "{}", text(&rebuilt));
+}
+
+#[test]
+fn source_rejects_outer_workspace_patch_and_replace() {
+    for override_table in ["patch.crates-io", "replace"] {
+        let temp = Temp::new();
+        let app = fixture(&temp);
+        let sdk = temp.join("lumendesk");
+        fs::create_dir_all(sdk.join("src")).unwrap();
+        fs::write(
+            sdk.join("Cargo.toml"),
+            "[package]\nname=\"lumendesk\"\nversion=\"0.1.0\"\nedition=\"2024\"\n",
+        )
+        .unwrap();
+        fs::write(sdk.join("src/lib.rs"), "pub fn value() {}\n").unwrap();
+        let member = fs::read_to_string(app.join("Cargo.toml"))
+            .unwrap()
+            .replace("[workspace]\n", "");
+        // An unused replacement is still an unsupported root resolution setting.
+        let dependency = if override_table == "replace" {
+            ""
+        } else {
+            "[dependencies]\nlumendesk=\"=0.1.0\"\n"
+        };
+        fs::write(app.join("Cargo.toml"), format!("{member}{dependency}")).unwrap();
+        let key = if override_table == "replace" {
+            "\"lumendesk:0.1.0\""
+        } else {
+            "lumendesk"
+        };
+        fs::write(temp.join("Cargo.toml"), format!("[workspace]\nmembers=[\"app\"]\nexclude=[\"lumendesk\"]\nresolver=\"3\"\n[{override_table}]\n{key}={{path=\"lumendesk\"}}\n")).unwrap();
+        let original = Command::new("cargo")
+            .args(["build", "--offline"])
+            .current_dir(&app)
+            .output()
+            .unwrap();
+        assert!(original.status.success(), "{}", text(&original));
+        let archive = temp.join("overrides.tar.gz");
+        let result = package(&app, &archive, "source");
+        assert!(
+            !result.status.success(),
+            "{override_table}: {}",
+            text(&result)
+        );
+        assert!(text(&result).contains("patch/replace"), "{}", text(&result));
+        assert!(!archive.exists());
+    }
+}
+
+#[test]
+fn source_resolves_inherited_license_file() {
+    let temp = Temp::new();
+    let app = fixture(&temp);
+    let manifest = fs::read_to_string(app.join("Cargo.toml")).unwrap().replace("[workspace]\n", "license-file.workspace=true\n[workspace]\n[workspace.package]\nlicense-file=\"LICENSE-MIT\"\n");
+    fs::write(app.join("Cargo.toml"), manifest).unwrap();
+    fs::write(app.join("LICENSE-MIT"), "application license notice").unwrap();
+    let archive = temp.join("inherited-license.tar.gz");
+    let result = package(&app, &archive, "source");
+    assert!(result.status.success(), "{}", text(&result));
+    let files = entries(&archive);
+    let rewritten: toml::Value =
+        toml::from_str(std::str::from_utf8(&files["Cargo.toml"]).unwrap()).unwrap();
+    assert_eq!(
+        rewritten["package"]["license-file"].as_str(),
+        Some("LICENSE-MIT")
+    );
+    assert_eq!(files["LICENSE-MIT"], b"application license notice");
+}
+
+#[test]
+fn source_does_not_activate_ignored_member_profiles() {
+    let temp = Temp::new();
+    let app = fixture(&temp);
+    fs::write(
+        temp.join("Cargo.toml"),
+        "[workspace]\nmembers=[\"app\"]\nresolver=\"3\"\n",
+    )
+    .unwrap();
+    let manifest = fs::read_to_string(app.join("Cargo.toml"))
+        .unwrap()
+        .replace("[workspace]\n", "[profile.release]\noverflow-checks=true\n");
+    fs::write(app.join("Cargo.toml"), manifest).unwrap();
+    let archive = temp.join("member-profile.tar.gz");
+    let result = package(&app, &archive, "source");
+    assert!(result.status.success(), "{}", text(&result));
+    let files = entries(&archive);
+    let rewritten: toml::Value =
+        toml::from_str(std::str::from_utf8(&files["Cargo.toml"]).unwrap()).unwrap();
+    assert!(rewritten.get("profile").is_none());
 }

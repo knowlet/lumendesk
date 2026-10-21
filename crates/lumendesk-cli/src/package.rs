@@ -170,6 +170,16 @@ pub(crate) fn create(project: &Path, kind: Kind, output: &Path, offline: bool) -
     let mut files = Files::new();
     if kind == Kind::Source {
         let resolver = workspace_resolver(&metadata)?;
+        let workspace_bytes =
+            read_regular_file(&workspace_root.join("Cargo.toml"), MAX_SOURCE_FILE, false)?;
+        let workspace_manifest: toml::Value =
+            toml::from_str(std::str::from_utf8(&workspace_bytes).map_err(|e| e.to_string())?)
+                .map_err(|e| e.to_string())?;
+        if workspace_manifest.get("patch").is_some() || workspace_manifest.get("replace").is_some()
+        {
+            return Err("portable packaging does not support Cargo patch/replace overrides".into());
+        }
+        let profiles = workspace_manifest.get("profile");
         files = app_files;
         // Cargo metadata creates/updates the application's resolution without executing build scripts.
         add_file(&mut files, "Cargo.lock", &lockfile_path, MAX_SOURCE_FILE)?;
@@ -200,7 +210,7 @@ pub(crate) fn create(project: &Path, kind: Kind, output: &Path, offline: bool) -
                 }
                 for name in ["LICENSE-MIT", "LICENSE-APACHE"] {
                     let source = sdk_workspace.join(name);
-                    if source.exists() {
+                    if source.exists() && !files.contains_key(&format!("{prefix}{name}")) {
                         add_file(
                             &mut files,
                             &format!("{prefix}{name}"),
@@ -210,7 +220,8 @@ pub(crate) fn create(project: &Path, kind: Kind, output: &Path, offline: bool) -
                     }
                 }
             }
-            let rewritten = rewrite_manifest(&manifest, package, prefix, &local, &resolver)?;
+            let rewritten =
+                rewrite_manifest(&manifest, package, prefix, &local, &resolver, profiles)?;
             insert(
                 &mut files,
                 &format!("{prefix}Cargo.toml"),
@@ -836,6 +847,7 @@ fn rewrite_manifest(
     prefix: &str,
     local: &BTreeMap<PathBuf, String>,
     resolver: &str,
+    profiles: Option<&toml::Value>,
 ) -> Result<String> {
     let mut manifest: toml::Value =
         toml::from_str(&fs::read_to_string(path).map_err(|e| e.to_string())?)
@@ -846,10 +858,10 @@ fn rewrite_manifest(
         .ok_or("manifest lacks package table")?;
     for (key, value) in package_table.iter_mut() {
         if value.get("workspace").and_then(toml::Value::as_bool) == Some(true) {
-            let metadata_key = if key == "rust-version" {
-                "rust_version"
-            } else {
-                key
+            let metadata_key = match key.as_str() {
+                "rust-version" => "rust_version",
+                "license-file" => "license_file",
+                _ => key,
             };
             let resolved = package
                 .get(metadata_key)
@@ -900,6 +912,12 @@ fn rewrite_manifest(
     }
     table.remove("workspace");
     if prefix.is_empty() {
+        // Cargo only honors profiles from the actual workspace root. A member's
+        // ignored profile must not become effective after relocation either.
+        table.remove("profile");
+        if let Some(profiles) = profiles {
+            table.insert("profile".into(), profiles.clone());
+        }
         let members = local
             .values()
             .filter(|value| !value.is_empty())
@@ -1072,11 +1090,14 @@ fn license_inventory(
             candidates.insert(path.into(), directory.join(path));
         }
         if package["source"].is_null()
-            && let Some(workspace) = find_workspace(directory)
+            && let Some(workspace) =
+                bundled_sdk_root(directory).or_else(|| find_workspace(directory))
         {
             for name in ["LICENSE-MIT", "LICENSE-APACHE"] {
                 if workspace.join(name).exists() {
-                    candidates.insert(name.into(), workspace.join(name));
+                    candidates
+                        .entry(name.into())
+                        .or_insert_with(|| workspace.join(name));
                 }
             }
         }

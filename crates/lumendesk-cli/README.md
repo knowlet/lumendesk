@@ -161,6 +161,13 @@ metadata is made explicit and dependency paths are rewritten relative to the
 archive. SDK/core license notices are copied alongside their source. The bundled
 crates are excluded from the application's workspace membership, retaining the
 original application's dependency/feature resolution and locked rebuild.
+The effective workspace root's resolver, lockfile and `[profile]` settings are
+preserved, including when the application is a workspace member. Ignored member
+profiles do not become active after relocation. Cargo `[patch]`/`[replace]`
+overrides are rejected at both the application and effective workspace root.
+Inherited `license-file` metadata is resolved without relaxing the source path
+allowlist. Crate-specific SDK notices take precedence over workspace fallback
+notices and remain intact when a source archive is repackaged as source or binary.
 
 Extract the source archive into an empty directory, then run:
 
