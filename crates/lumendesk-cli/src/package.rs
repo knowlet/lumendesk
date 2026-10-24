@@ -605,7 +605,11 @@ fn collect(root: &Path, relative: &Path, prefix: &str, files: &mut Files) -> Res
         if excluded(&name) {
             // Never read excluded inputs or silently produce an incomplete Rust
             // source tree. This is deliberately conservative, not a module parser.
-            if child.starts_with("src") || child.extension().is_some_and(|ext| ext == "rs") {
+            if ["src", "examples", "tests"]
+                .iter()
+                .any(|source_root| child.starts_with(source_root))
+                || child.extension().is_some_and(|ext| ext == "rs")
+            {
                 return Err(format!(
                     "excluded compilation-source candidate: {}; restructure the source tree to avoid excluded names before packaging",
                     child
@@ -1845,6 +1849,8 @@ mod tests {
         for path in [
             "src/.private/data.rs",
             "src/secret.json",
+            "examples/cache/mod.rs",
+            "tests/cache/mod.rs",
             "examples/password.rs",
             "tests/credentials.rs",
             "password.rs",
@@ -1865,16 +1871,111 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn excluded_source_links_are_rejected_without_following_them() {
-        let fixture = Fixture::new();
-        fs::create_dir(fixture.0.join("src")).unwrap();
-        std::os::unix::fs::symlink("missing-target", fixture.0.join("src/cache")).unwrap();
-        let mut files = Files::new();
-        assert!(
-            collect(&fixture.0, Path::new(""), "", &mut files)
-                .unwrap_err()
-                .contains("excluded compilation-source candidate")
-        );
-        assert!(files.is_empty());
+        for source_root in ["src", "examples", "tests"] {
+            let fixture = Fixture::new();
+            fs::create_dir(fixture.0.join(source_root)).unwrap();
+            std::os::unix::fs::symlink("missing-target", fixture.0.join(source_root).join("cache"))
+                .unwrap();
+            let mut files = Files::new();
+            assert!(
+                collect(&fixture.0, Path::new(""), "", &mut files)
+                    .unwrap_err()
+                    .contains(&format!(
+                        "excluded compilation-source candidate: {source_root}/cache;"
+                    ))
+            );
+            assert!(files.is_empty());
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn excluded_candidates_are_rejected_without_opening_private_inputs() {
+        use std::{
+            ffi::CString,
+            os::{
+                fd::{AsRawFd, FromRawFd},
+                unix::ffi::OsStrExt,
+            },
+        };
+
+        fn watch(path: &Path) -> fs::File {
+            // SAFETY: inotify_init1 has no pointer arguments and returns an owned fd.
+            let fd = unsafe { libc::inotify_init1(libc::IN_CLOEXEC | libc::IN_NONBLOCK) };
+            assert!(fd >= 0, "{}", std::io::Error::last_os_error());
+            // SAFETY: fd is a valid, uniquely owned descriptor from inotify_init1.
+            let watcher = unsafe { fs::File::from_raw_fd(fd) };
+            let path = CString::new(path.as_os_str().as_bytes()).unwrap();
+            // SAFETY: watcher owns a live descriptor and path is a NUL-terminated string.
+            let wd = unsafe {
+                libc::inotify_add_watch(
+                    watcher.as_raw_fd(),
+                    path.as_ptr(),
+                    libc::IN_OPEN | libc::IN_ACCESS,
+                )
+            };
+            assert!(wd >= 0, "{}", std::io::Error::last_os_error());
+            watcher
+        }
+        fn has_events(watcher: &mut fs::File) -> bool {
+            let mut buffer = [0; 4096];
+            match watcher.read(&mut buffer) {
+                Ok(size) => size > 0,
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => false,
+                Err(error) => panic!("cannot read inotify events: {error}"),
+            }
+        }
+
+        for (path, excluded) in [
+            ("src/cache/mod.rs", "src/cache"),
+            ("examples/cache/mod.rs", "examples/cache"),
+            ("tests/cache/mod.rs", "tests/cache"),
+            ("examples/nested/cache/mod.rs", "examples/nested/cache"),
+            ("tests/nested/cache/mod.rs", "tests/nested/cache"),
+            ("src/password.rs", "src/password.rs"),
+            ("examples/password.rs", "examples/password.rs"),
+            ("tests/credentials.rs", "tests/credentials.rs"),
+            ("password.rs", "password.rs"),
+        ] {
+            let fixture = Fixture::new();
+            fixture.write(path, b"PRIVATE_CONTENT");
+            let private_file = fixture.0.join(path);
+            let excluded_entry = fixture.0.join(excluded);
+            let mut file_watch = watch(&private_file);
+            let mut directory_watch = (path != excluded).then(|| watch(&excluded_entry));
+            let mut files = Files::new();
+            let error = collect(&fixture.0, Path::new(""), "", &mut files).unwrap_err();
+            assert!(
+                error.contains(&format!(
+                    "excluded compilation-source candidate: {excluded};"
+                )),
+                "{error}"
+            );
+            assert!(!error.contains("PRIVATE_CONTENT"));
+            assert!(files.is_empty());
+            assert!(!has_events(&mut file_watch), "opened private file {path}");
+            if let Some(watcher) = &mut directory_watch {
+                assert!(
+                    !has_events(watcher),
+                    "traversed excluded directory {excluded}"
+                );
+            }
+
+            // Positive controls prove that reads and directory opens are observable.
+            fs::read(&private_file).unwrap();
+            assert!(
+                has_events(&mut file_watch),
+                "file watch missed its positive control"
+            );
+            if let Some(watcher) = &mut directory_watch {
+                let _ = has_events(watcher); // Drain events from the file-read control.
+                drop(fs::read_dir(&excluded_entry).unwrap());
+                assert!(
+                    has_events(watcher),
+                    "directory watch missed its positive control"
+                );
+            }
+        }
     }
 
     #[test]

@@ -86,45 +86,69 @@ fn entries(path: &Path) -> BTreeMap<String, Vec<u8>> {
 }
 #[test]
 fn source_archive_rejects_excluded_rust_module_candidates() {
-    for module in [
-        "cache/mod.rs",
-        "build/mod.rs",
-        "vendor/mod.rs",
-        "password.rs",
-        "credentials.rs",
-        "secrets.rs",
-    ] {
+    for root in ["src", "examples", "tests"] {
+        for module in [
+            "cache/mod.rs",
+            "build/mod.rs",
+            "vendor/mod.rs",
+            "password.rs",
+            "credentials.rs",
+            "secrets.rs",
+        ] {
+            let temp = Temp::new();
+            let app = fixture(&temp);
+            let name = module.split(['/', '.']).next().unwrap();
+            let source = app.join(root).join(module);
+            fs::create_dir_all(source.parent().unwrap()).unwrap();
+            fs::write(source, "pub fn run() {}\nfn main() { run(); }\n").unwrap();
+            let entry = if root == "src" { "main.rs" } else { "demo.rs" };
+            fs::write(
+                app.join(root).join(entry),
+                format!("mod {name}; fn main() {{ {name}::run(); }}\n"),
+            )
+            .unwrap();
+            assert_compiles_and_rejects_candidate(
+                &app,
+                &temp,
+                &format!("{root}/{}", module.split('/').next().unwrap()),
+            );
+        }
+    }
+}
+
+#[test]
+fn archives_reject_excluded_auto_discovered_cargo_targets() {
+    for root in ["examples", "tests"] {
         let temp = Temp::new();
         let app = fixture(&temp);
-        let name = module.split(['/', '.']).next().unwrap();
-        let source = app.join("src").join(module);
-        fs::create_dir_all(source.parent().unwrap()).unwrap();
-        fs::write(source, "pub fn run() {}\n").unwrap();
-        fs::write(
-            app.join("src/main.rs"),
-            format!("mod {name}; fn main() {{ {name}::run(); }}\n"),
-        )
+        fs::create_dir_all(app.join(root).join("cache")).unwrap();
+        fs::write(app.join(root).join("cache/main.rs"), "fn main() {}\n").unwrap();
+        assert_compiles_and_rejects_candidate(&app, &temp, &format!("{root}/cache"));
+    }
+}
+
+fn assert_compiles_and_rejects_candidate(app: &Path, temp: &Temp, candidate: &str) {
+    let build = Command::new("cargo")
+        .current_dir(app)
+        .args(["check", "--all-targets", "--offline"])
+        .output()
         .unwrap();
-        let build = Command::new("cargo")
-            .current_dir(&app)
-            .args(["check", "--offline"])
-            .output()
-            .unwrap();
-        assert!(build.status.success(), "{}", text(&build));
-        let archive = temp.join("source.tar.gz");
-        let output = package(&app, &archive, "source");
+    assert!(build.status.success(), "{candidate}: {}", text(&build));
+    // Both modes share the input collector, before any Cargo build or archive write.
+    for kind in ["source", "binary"] {
+        let archive = temp.join(&format!("{kind}.tar.gz"));
+        let output = package(app, &archive, kind);
         assert!(
             !output.status.success(),
-            "silently omitted {module}: {}",
+            "silently omitted {candidate} ({kind}): {}",
             text(&output)
         );
+        // The complete encountered entry is reported. Do not traverse an excluded
+        // directory to discover the private filenames beneath it.
         assert!(
-            text(&output).contains("excluded compilation-source candidate"),
-            "{}",
-            text(&output)
-        );
-        assert!(
-            text(&output).contains(&format!("src/{name}")),
+            text(&output).contains(&format!(
+                "excluded compilation-source candidate: {candidate}; restructure"
+            )),
             "{}",
             text(&output)
         );
@@ -159,6 +183,8 @@ fn source_is_deterministic_checksummed_and_excludes_secrets_and_caches() {
         (".git/config", "SECRET_GIT"),
         ("target/debug/cache.rs", "SECRET_TARGET"),
         ("node_modules/a/index.js", "SECRET_NODE"),
+        ("web/cache/mod.rs", "SECRET_WEB_CACHE"),
+        ("assets/cache/mod.rs", "SECRET_ASSET_CACHE"),
         ("web/credentials.json", "SECRET_CREDENTIALS"),
         ("web/private.pem", "SECRET_KEY"),
         ("web/.private/data.rs", "SECRET_HIDDEN"),
