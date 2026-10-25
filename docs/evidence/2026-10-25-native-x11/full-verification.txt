@@ -1,0 +1,375 @@
+    Blocking waiting for file lock on build directory
+   Compiling lumendesk v0.1.0 (/workspace/lumendesk/crates/lumendesk)
+    Finished `test` profile [unoptimized] target(s) in 15.68s
+     Running unittests src/lib.rs (target/debug/deps/lumendesk-9eff95941687fac7)
+
+running 18 tests
+test native::tests::native_minimized_logic_cancels_first_close_only ... ok
+test tests::desktop_services_fail_explicitly ... ok
+test tests::rejects_bad_geometry ... ok
+test tests::shared_form_unicode_and_disabled ... ok
+test web_streams::tests::duplicate_credit_and_allocation_limits_are_explicit ... ok
+test web_streams::tests::idle_expiry_cancels_blocked_producer_and_reclaims_slot ... ok
+test web_streams::tests::immediate_cancellation_reclaims_stream_without_a_queued_command_or_read_credit ... ok
+test web_streams::tests::registration_errors_do_not_require_a_pull_and_stale_receivers_are_dropped ... ok
+test web_streams::tests::slow_consumer_has_no_unsolicited_values_and_completion_follows_last_item ... ok
+test web_streams::tests::work_budget_remains_bounded_until_worker_releases ... ok
+test webview::tests::broadcast_overflow_never_partially_delivers ... ok
+test webview::tests::bundled_assets_embed_all_resources_and_reject_traversal ... ok
+test webview::tests::delivery_scripts_bind_the_execution_to_the_original_page_session ... ok
+test webview::tests::events_are_bounded_typed_and_targeted ... ok
+test webview::tests::exact_origin_matching_is_not_prefix_matching ... ok
+test native::tests::native_visible_logic_and_ui_count_each_close_once ... ok
+test native::tests::native_view_click_and_disabled_semantics ... ok
+test native::tests::native_keyboard_focus_and_activation ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running unittests src/lib.rs (target/debug/deps/lumendesk_cli-5e756ef20d4e71e7)
+
+running 13 tests
+test license_overrides::tests::supplements_do_not_cross_package_or_registry_identities ... ok
+test license_overrides::tests::copied_notice_does_not_hide_upstream_redistribution_caveats ... ok
+test package::tests::archive_paths_are_portable_and_cannot_escape ... ok
+test package::tests::binary_inventory_excludes_unreachable_and_dev_only_packages ... ok
+test package::tests::dependency_notice_scans_reject_links_and_bound_directory_depth ... ok
+test package::tests::archive_paths_reject_colliding_directory_components_and_file_prefixes ... ok
+test package::tests::dependency_notices_include_nested_vendored_texts_without_source_or_binary_lookalikes ... ok
+test package::tests::excluded_source_links_are_rejected_without_following_them ... ok
+test package::tests::excluded_source_candidates_fail_without_reading_or_including_them ... ok
+test package::tests::source_filter_is_an_allowlist_with_sensitive_name_exclusions ... ok
+test package::tests::source_availability_requires_archive_checksum_and_unmodified_registry_tree ... ok
+test license_overrides::tests::embedded_notice_bytes_match_reviewed_source_digests ... ok
+test package::tests::excluded_candidates_are_rejected_without_opening_private_inputs ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running unittests src/main.rs (target/debug/deps/lumendesk-c8ec5e9a560ecd28)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli.rs (target/debug/deps/cli-7b26e4b28c5a34b1)
+
+running 17 tests
+test config_rejects_unknown_fields_unsupported_versions_and_escaping_paths ... ok
+test bindings_default_project_path_replaces_existing_generated_file ... ok
+test bindings_accept_runtime_stream_registry_and_validate_names ... ok
+test destination_symlink_is_rejected ... ok
+test bindings_are_deterministic_and_validate_registry ... ok
+test configured_bindings_reject_symlink_files_and_directories_without_touching_external_data ... ok
+test doctor_reports_missing_tools_without_claiming_success ... ok
+test explicit_bindings_output_rejects_symlinks_and_replaces_hardlinks_safely ... ok
+test doctor_rejects_old_rust_compiler ... ok
+test invalid_names_modes_and_sdk_fail_before_creating_files ... ok
+test missing_cargo_and_malformed_schema_are_actionable_failures ... ok
+test populated_destination_is_preserved_exactly ... ok
+test help_version_unknown_commands_and_missing_config ... ok
+test scaffolds_both_modes_in_fresh_and_empty_directories ... ok
+test release_build_produces_real_executable ... ok
+test dev_once_sets_separate_identity_and_propagates_app_failure ... ok
+test dev_preserves_working_process_on_failure_then_releases_resources_before_swap ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.81s
+
+     Running tests/package.rs (target/debug/deps/package-624b62c9cc8f438d)
+
+running 19 tests
+test cross_platform_path_escapes_fail_closed ... ok
+test hardlink_inputs_fail_closed_on_each_supported_platform ... ok
+test input_links_and_output_symlink_components_are_rejected ... ok
+test real_web_source_archive_builds_and_retains_sdk_test_fixtures ... ignored, requires configured WebKit/GTK development libraries and cached dependencies
+test fifo_configuration_is_rejected_without_blocking_on_a_reader ... ok
+test source_does_not_activate_ignored_member_profiles ... ok
+test source_is_deterministic_checksummed_and_excludes_secrets_and_caches ... ok
+test archives_reject_excluded_auto_discovered_cargo_targets ... ok
+test source_preserves_outer_workspace_release_profile ... ok
+test binary_archive_contains_a_real_host_executable_and_runtime_notes ... ok
+test source_preserves_resolver_one_feature_unification ... ok
+test source_preserves_root_workspace_lints_after_relocation ... ok
+test source_rejects_outer_workspace_patch_and_replace ... ok
+test source_rejects_sdk_workspace_lint_inheritance_before_writing_archive ... ok
+test source_resolves_inherited_license_file ... ok
+test source_preserves_effective_workspace_resolver ... ok
+test unsupported_local_dependencies_and_configured_escape_fail ... ok
+test source_rebuilds_after_original_app_and_sdk_are_removed ... ok
+test source_archive_rejects_excluded_rust_module_candidates ... ok
+
+test result: ok. 18 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.09s
+
+     Running unittests src/lib.rs (target/debug/deps/lumendesk_core-0a24bc4c0d7c0fff)
+
+running 48 tests
+test assets::tests::bounded_decode_fails_closed ... ok
+test assets::tests::canonicalizes_slashes_dot_segments_and_unicode ... ok
+test assets::tests::entry_css_and_binary_bytes_preserve_mime ... ok
+test assets::tests::failed_inserts_are_atomic_and_normalized_keys_replace ... ok
+test assets::tests::missing_entry_and_empty_asset_keys_are_explicit_errors ... ok
+test assets::tests::rejects_backslashes_controls_invalid_utf8_and_uri_confusion ... ok
+test assets::tests::fallback_only_for_extensionless_missing_final_component ... ok
+test bridge::tests::call_completion_closes_retained_streams_and_contexts ... ok
+test bridge::tests::backend_errors_and_result_schema_mismatch_are_explicit ... ok
+test bridge::tests::cancelling_before_dispatch_prevents_execution_and_has_a_bound ... ok
+test assets::tests::rejects_plain_encoded_mixed_and_multiencoded_traversal ... ok
+test bridge::tests::leaving_a_call_stream_early_cancels_the_call ... ok
+test bridge::tests::navigation_cancels_buffered_streams_after_the_handler_finished ... ok
+test bridge::tests::normalizes_standard_default_ports_but_never_trusts_localhost ... ok
+test bridge::tests::enforces_payload_result_limits_and_contains_panics ... ok
+test bridge::tests::rejects_external_lookalike_frames_and_credentials ... ok
+test bridge::tests::sessions_do_not_cross_windows_or_bridges ... ok
+test events::tests::callback_panic_does_not_starve_later_subscribers_or_replay_once ... ok
+test events::tests::callback_panic_does_not_starve_ready_or_unready_broadcast_destinations ... ok
+test bridge::tests::navigation_invalidates_authority_and_cancels_pending_work ... ok
+test bridge::tests::typed_unicode_roundtrip_and_failure_contracts ... ok
+test events::tests::event_schema_is_checked ... ok
+test events::tests::callback_panics_do_not_discard_remaining_queued_events ... ok
+test events::tests::foreign_bus_listener_id_cannot_unsubscribe_local_listener ... ok
+test events::tests::navigation_removes_listeners_and_queued_data_and_close_fails ... ok
+test events::tests::overflow_is_bounded_and_broadcast_atomic ... ok
+test events::tests::targeted_broadcast_ready_once_unsubscribe ... ok
+test lifecycle::tests::a_foreign_listener_token_cannot_remove_a_local_listener ... ok
+test lifecycle::tests::close_cancellation_is_sticky_and_all_listeners_run_in_order ... ok
+test lifecycle::tests::complete_order_and_exactly_once_readiness ... ok
+test lifecycle::tests::close_request_panic_preserves_state_and_runs_remaining_listeners ... ok
+test lifecycle::tests::destruction_bypasses_cancellation_but_reports_shutdown_states ... ok
+test lifecycle::tests::first_close_can_be_cancelled_and_second_allowed ... ok
+test lifecycle::tests::every_listener_kind_can_be_removed_before_it_runs_again ... ok
+test lifecycle::tests::independent_lifecycles_do_not_share_state ... ok
+test lifecycle::tests::invalid_transitions_leave_history_and_readiness_unchanged ... ok
+test lifecycle::tests::late_ready_runs_before_registration_returns_even_after_closure ... ok
+test lifecycle::tests::ready_callbacks_follow_state_callbacks_in_registration_order ... ok
+test lifecycle::tests::readiness_notifications_finish_before_resuming_a_callback_panic ... ok
+test lifecycle::tests::shutdown_finishes_before_resuming_a_state_callback_panic ... ok
+test schema::tests::rejects_unsafe_and_fractional_integers ... ok
+test schema::tests::optional_is_not_nullable_and_unknown_fields_fail ... ok
+test schema::tests::output_is_deterministic_and_quotes_arbitrary_names ... ok
+test stream::tests::bounded_and_ordered_before_completion ... ok
+test stream::tests::navigation_cancellation_discards_buffered_values ... ok
+test stream::tests::consumer_leaving_cancels_producer ... ok
+test stream::tests::rejected_sends_do_not_skip_sequence_numbers ... ok
+test stream::tests::unfinished_producer_reports_error_after_values ... ok
+
+test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/frontend_streams.rs (target/debug/deps/frontend_streams-8b0daf6deab5fb5f)
+
+running 21 tests
+test admission_errors_cannot_expand_a_valid_request_past_the_result_limit ... ok
+test closing_a_window_cancels_its_stream_without_touching_another ... ok
+test completion_drain_releases_budget_and_navigation_cancels_finished_buffer ... ok
+test dropped_unrun_job_reports_failure_and_consumer_dropout_prevents_handler ... ok
+test blocked_producer_wakes_when_consumer_drops ... ok
+test dropping_an_old_receiver_cannot_release_a_new_session_request ... ok
+test finished_but_undrained_streams_keep_pending_budget_and_remain_cancellable ... ok
+test jobs_and_receivers_are_send_and_keep_original_authority ... ok
+test legacy_schemas_parse_and_stream_generation_is_deterministic ... ok
+test invalid_authority_and_wrong_method_kind_never_run_producers ... ok
+test normal_calls_and_streams_share_replay_namespace_and_precancellation ... ok
+test oversized_terminal_errors_are_bounded_after_accepted_values ... ok
+test registration_collisions_are_atomic_in_both_directions ... ok
+test retained_producer_and_context_are_sealed_on_handler_return ... ok
+test request_item_and_result_size_limits_are_independent ... ok
+test schema_validation_covers_arguments_items_and_terminal_result ... ok
+test terminal_failure_and_panic_follow_accepted_values ... ok
+test zero_capacity_does_not_consume_id_and_empty_stream_completes ... ok
+test nonblocking_backpressure_rejection_does_not_consume_sequence ... ok
+test navigation_interrupts_blocked_producer_and_discards_buffered_values ... ok
+test slow_pull_consumer_observes_bounded_ordered_values_then_result ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/typescript.rs (target/debug/deps/typescript-2ee4303cf0603b7d)
+
+running 1 test
+test generated_typescript_matches_checked_fixture ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lumendesk
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lumendesk_cli
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lumendesk_core
+
+running 2 tests
+test crates/lumendesk-core/src/lib.rs - (line 84) ... ok
+test crates/lumendesk-core/src/lib.rs - (line 12) ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.22s; merged doctests compilation took 0.22s
+    Checking lumendesk v0.1.0 (/workspace/lumendesk/crates/lumendesk)
+    Finished `dev` profile [unoptimized] target(s) in 0.48s
+   Compiling lumendesk v0.1.0 (/workspace/lumendesk/crates/lumendesk)
+    Finished `dev` profile [unoptimized] target(s) in 1.75s
+✔ every sample frontend script ID names an actual element (0.966456ms)
+✔ sample page resource links exist and are included in the Rust asset bundle (2.832807ms)
+✔ sample app JavaScript parses without a frontend build tool (0.465481ms)
+✔ web scaffold contains parseable JavaScript and matches all literal ID selectors (0.386873ms)
+✔ installs an immutable runtime and announces readiness exactly once (3.75739ms)
+✔ ordinary browser without the native IPC transport receives no runtime (0.612172ms)
+✔ a mocked embedded frame cannot install the runtime even with IPC present (0.595638ms)
+✔ an existing runtime is neither replaced nor re-announced (0.609869ms)
+✔ round-trips Unicode and nested JSON with session-scoped increasing IDs (1.517236ms)
+✔ successful falsy result values are distinguished from backend errors (0.654375ms)
+✔ backend failures preserve error messages and error codes (1.751758ms)
+✔ a code-only backend failure still rejects with a useful message (0.733455ms)
+✔ malformed matching reply rejects explicitly and cleans up: null result (1.104834ms)
+✔ malformed matching reply rejects explicitly and cleans up: missing result (0.898192ms)
+✔ malformed matching reply rejects explicitly and cleans up: string result (0.735548ms)
+✔ malformed matching reply rejects explicitly and cleans up: number result (0.660765ms)
+✔ malformed matching reply rejects explicitly and cleans up: boolean result (1.439919ms)
+✔ malformed matching reply rejects explicitly and cleans up: array result (0.666824ms)
+✔ malformed matching reply rejects explicitly and cleans up: empty result object (0.969891ms)
+✔ malformed matching reply rejects explicitly and cleans up: unknown result tag (0.761958ms)
+✔ malformed matching reply rejects explicitly and cleans up: both result tags (0.687906ms)
+✔ malformed matching reply rejects explicitly and cleans up: extra result field (0.654807ms)
+✔ malformed matching reply rejects explicitly and cleans up: undefined success (0.587725ms)
+✔ malformed matching reply rejects explicitly and cleans up: null error details (0.550309ms)
+✔ malformed matching reply rejects explicitly and cleans up: string error details (0.883922ms)
+✔ malformed matching reply rejects explicitly and cleans up: array error details (0.576078ms)
+✔ malformed matching reply rejects explicitly and cleans up: missing error code (0.568887ms)
+✔ malformed matching reply rejects explicitly and cleans up: nonstring error code (0.52401ms)
+✔ malformed matching reply rejects explicitly and cleans up: empty error code (0.58387ms)
+✔ malformed matching reply rejects explicitly and cleans up: nonstring error message (0.507093ms)
+✔ malformed matching reply rejects explicitly and cleans up: extra error field (1.510385ms)
+✔ unidentifiable malformed response envelopes leave valid calls and timers intact (0.607245ms)
+✔ a throwing matching result accessor cannot strand its promise (0.629538ms)
+✔ concurrent responses resolve only the matching calls even out of order (0.583769ms)
+✔ unknown or duplicate response IDs cannot settle a different call (0.516939ms)
+✔ invalid method names reject before allocating timers or invoking IPC (0.629618ms)
+✔ transport failure rejects immediately and releases timer and pending capacity (1.465508ms)
+✔ non-serializable circular arguments reject without leaking pending calls (1.265876ms)
+✔ pending call count is bounded at 32 and freed capacity is reusable (0.94921ms)
+✔ timeout rejects, sends a session-scoped cancellation, and frees capacity (1.046386ms)
+✔ generated-client AbortSignal argument cancels a pending call exactly once (0.78982ms)
+✔ already-aborted direct signal rejects without IPC or timers (0.619514ms)
+✔ already-aborted options.signal rejects without IPC or timers (0.559693ms)
+✔ timeout options can include AbortSignal and timeout removes its listener (0.601316ms)
+✔ response cleanup removes the abort listener: success (0.604791ms)
+✔ response cleanup removes the abort listener: backend failure (0.633344ms)
+✔ response cleanup removes the abort listener: malformed reply (0.530979ms)
+✔ pagehide removes abort listeners while rejecting pending calls (0.662117ms)
+✔ transport failure removes the attached abort listener (0.562577ms)
+✔ abort during argument serialization prevents sending the request (0.649268ms)
+✔ invalid options.signal rejects without sending or leaking timers (0.553213ms)
+✔ successful completion removes the timeout without sending cancellation (0.617771ms)
+✔ timeout duration has a default and clamps positive extremes (0.622978ms)
+✔ pagehide rejects all pending calls and permanently rejects new calls (0.659814ms)
+✔ events preserve Unicode/nested payloads and do not cross event names (0.626013ms)
+✔ once listeners are removed before their callback, including recursive emission (0.540895ms)
+✔ unsubscribe is idempotent and prevents all later event deliveries (0.552012ms)
+✔ one event callback throwing does not block remaining listeners (0.656108ms)
+✔ invalid event listeners are rejected synchronously (0.614165ms)
+✔ pagehide clears previously registered event listeners (0.780325ms)
+✔ stream registration is independent and IDs are shared monotonically with calls (1.211505ms)
+✔ slow consumers grant exactly one pull for each next with no eager item buffering (5.85603ms)
+✔ for-await delivers ordered Unicode and falsy items before terminal completion (16.693043ms)
+✔ terminal immediately after the last item is retained until the following next (0.878663ms)
+✔ a concurrent next rejects explicitly without stealing the first read or sending credit (0.768587ms)
+✔ multiple streams and a call remain isolated across out-of-order replies (0.784211ms)
+✔ return cancels exactly once, cleans listeners, and closes an idle read (0.919755ms)
+✔ return cancels exactly once, cleans listeners, and closes a pending read (0.964734ms)
+✔ breaking for-await closes the host stream and rejects the final-result promise (0.622117ms)
+✔ throw rejects a pending reader and result, cancels once, and returns its rejection (0.748968ms)
+✔ already-aborted stream direct signal sends no IPC and allocates no resources (0.803511ms)
+✔ already-aborted stream options sends no IPC and allocates no resources (0.581676ms)
+✔ abort closes an idle stream and ignores later items (0.698843ms)
+✔ abort closes a pending stream and ignores later items (1.039826ms)
+✔ aborting while serializing stream arguments sends nothing and leaves no listener or timer (0.698031ms)
+✔ pagehide rejects pending and idle streams, cancels both, and bars new streams (0.847696ms)
+✔ stream timeout bounds unstarted lifetime and releases every resource (0.696489ms)
+✔ stream timeout bounds pending read lifetime and releases every resource (0.55795ms)
+✔ stream timeout bounds between reads lifetime and releases every resource (0.541516ms)
+✔ each next and item renews one stream timer rather than retaining a whole-stream deadline (0.631671ms)
+✔ stream timeout clamps extremes and uses a finite default (0.76345ms)
+✔ live streams are limited to 16 and cancelled capacity is reusable (1.024844ms)
+✔ combined call and stream capacity is limited to 32 in either registration order (2.106243ms)
+✔ completed unconsumed terminal state does not occupy a live stream slot (1.106566ms)
+✔ terminal backend errors reject result and future next with their code (0.713805ms)
+✔ terminal backend errors reject result and pending next with their code (0.598822ms)
+✔ code-only terminal errors retain a useful message (0.720355ms)
+✔ malformed matching stream frame rejects and cancels without leaking: missing body (0.728878ms)
+✔ malformed matching stream frame rejects and cancels without leaking: undefined item (0.538191ms)
+✔ malformed matching stream frame rejects and cancels without leaking: item and terminal (0.581716ms)
+✔ malformed matching stream frame rejects and cancels without leaking: item extra field (0.639994ms)
+✔ malformed matching stream frame rejects and cancels without leaking: false done (0.554946ms)
+✔ malformed matching stream frame rejects and cancels without leaking: missing done (0.615217ms)
+✔ malformed matching stream frame rejects and cancels without leaking: missing result (0.649648ms)
+✔ malformed matching stream frame rejects and cancels without leaking: extra terminal field (0.57129ms)
+✔ malformed matching stream frame rejects and cancels without leaking: null result (0.653444ms)
+✔ malformed matching stream frame rejects and cancels without leaking: empty result (0.659463ms)
+✔ malformed matching stream frame rejects and cancels without leaking: array result (0.874938ms)
+✔ malformed matching stream frame rejects and cancels without leaking: unknown result (0.569759ms)
+✔ malformed matching stream frame rejects and cancels without leaking: both result tags (0.729719ms)
+✔ malformed matching stream frame rejects and cancels without leaking: undefined success (0.636298ms)
+✔ malformed matching stream frame rejects and cancels without leaking: null error (0.61758ms)
+✔ malformed matching stream frame rejects and cancels without leaking: missing code (0.568176ms)
+✔ malformed matching stream frame rejects and cancels without leaking: empty code (0.557811ms)
+✔ malformed matching stream frame rejects and cancels without leaking: nonstring message (0.653865ms)
+✔ malformed matching stream frame rejects and cancels without leaking: extra error field (0.629228ms)
+✔ unidentifiable and unknown stream frames are ignored without consuming a read (0.884071ms)
+✔ throwing terminal accessor cannot strand a stream (0.687776ms)
+✔ throwing item accessor cannot strand a stream (0.572082ms)
+✔ unsolicited stream item cancels instead of buffering without credit (1.784118ms)
+✔ duplicate stream item cancels instead of buffering without credit (1.205986ms)
+✔ late and duplicate stream terminal frames cannot change settled result or another stream (1.18834ms)
+✔ invalid stream methods and options reject through iterator and result without IPC (3.526081ms)
+✔ nonserializable stream arguments reject without listener, timer, or capacity leaks (1.771218ms)
+✔ stream registration transport failures cannot leak capacity or abort listeners (2.621459ms)
+✔ navigation during stream argument serialization prevents registration (0.646044ms)
+✔ reentrant argument serialization cannot exceed the combined capacity bound (0.828298ms)
+✔ reentrant call serialization cannot exceed combined capacity with streams (1.051494ms)
+✔ pull transport failure rejects read and result and removes the live stream (0.628667ms)
+✔ cancellation transport failure never strands pending reads or cleanup (0.613214ms)
+✔ return after successful completion leaves result fulfilled and sends no cancellation (0.567815ms)
+✔ reentrant stream serialization cannot bypass the 16-stream bound (0.846085ms)
+✔ navigation during call serialization prevents an otherwise-valid late call (0.503989ms)
+✔ shared Rust-host wire fixture delivers items and final result with one credit per frame (9.938059ms)
+✔ host lifetime ceiling rejects a pending read even with a longer frontend timeout (1.044503ms)
+✔ reentrant call arguments keep call request IDs in transport order (0.71032ms)
+✔ reentrant call arguments keep stream request IDs in transport order (0.482157ms)
+✔ reentrant stream arguments keep call request IDs in transport order (0.522828ms)
+✔ reentrant stream arguments keep stream request IDs in transport order (0.519302ms)
+✔ delayed Rust delivery scripts cannot settle work or emit events in a replacement page (2.811194ms)
+✔ Rust delivery scripts preserve JSON __proto__ keys as data for calls, streams and events (2.042115ms)
+✔ call request IDs remain ordered when an abort listener submits nested work (0.884101ms)
+✔ call request IDs remain ordered when an abort aborted getter submits nested work (0.607816ms)
+✔ stream request IDs remain ordered when an abort listener submits nested work (0.51153ms)
+✔ stream request IDs remain ordered when an abort aborted getter submits nested work (0.581165ms)
+ℹ tests 135
+ℹ suites 0
+ℹ pass 135
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 211.024135
+
+> test:types
+> node tests/verify-types.mjs && sh crates/lumendesk-core/tests/typescript/check.sh
+
+TypeScript: positive fixture passed; all four expected invalid uses rejected.
+crates/lumendesk-core/tests/typescript/invalid.ts(3,13): error TS2345: Argument of type '"missing-method"' is not assignable to parameter of type 'keyof Methods'.
+crates/lumendesk-core/tests/typescript/invalid.ts(4,24): error TS2345: Argument of type 'undefined' is not assignable to parameter of type 'null'.
+crates/lumendesk-core/tests/typescript/invalid.ts(5,24): error TS2740: Type '{ label: string; }' is missing the following properties from type '{ active: boolean; anything: JsonValue; count: number; empty: null; label: string; nested: { child: string; }; nullable: string | null; optional?: number; optionalNullable?: boolean | null; ratio: number; tags: string[]; }': "active", "anything", "count", "empty", and 4 more.
+crates/lumendesk-core/tests/typescript/invalid.ts(6,22): error TS2345: Argument of type '(payload: string) => void' is not assignable to parameter of type '(payload: { name: string; revision: number; }) => void'.
+  Types of parameters 'payload' and 'payload' are incompatible.
+    Type '{ name: string; revision: number; }' is not assignable to type 'string'.
+crates/lumendesk-core/tests/typescript/invalid.ts(7,15): error TS2345: Argument of type '"missing-stream"' is not assignable to parameter of type 'keyof StreamMethods'.
+crates/lumendesk-core/tests/typescript/invalid.ts(8,24): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+Positive TypeScript fixture passed; invalid fixture failed as expected.
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice

@@ -1,0 +1,23 @@
+   Compiling lumendesk v0.1.0 (/workspace/lumendesk/crates/lumendesk)
+    Finished `test` profile [unoptimized] target(s) in 0.84s
+     Running unittests src/lib.rs (target/debug/deps/lumendesk-80a990616d4fdf4c)
+
+running 1 test
+test native::tests::native_minimized_logic_cancels_first_close_only ... FAILED
+
+failures:
+
+---- native::tests::native_minimized_logic_cancels_first_close_only stdout ----
+
+thread 'native::tests::native_minimized_logic_cancels_first_close_only' (25281) panicked at crates/lumendesk/src/native.rs:201:9:
+assertion failed: first.viewport_commands.get(&egui::ViewportId::ROOT).is_some_and(|commands|
+        commands.contains(&egui::ViewportCommand::CancelClose))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    native::tests::native_minimized_logic_cancels_first_close_only
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p lumendesk --lib`

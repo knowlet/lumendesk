@@ -1,0 +1,171 @@
+{
+  "scenario": "minimized-close",
+  "started_at": "2026-10-25T06:20:29.012498+00:00",
+  "git_head": "b0ef9ccfa2d8155425b8cf62d62b5781c3242fe2",
+  "binary_sha256": "4df2794d6b90fd9646096fcc14f96cb512784988ed815a93f1c36cad8a00c2da",
+  "display": ":92",
+  "smoke_ms": null,
+  "input_method": "xdotool X11 pointer/key events to actual eframe window",
+  "steps": [
+    {
+      "command": [
+        "git",
+        "-C",
+        "/workspace/lumendesk",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.002,
+      "stdout": "b0ef9ccfa2d8155425b8cf62d62b5781c3242fe2\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xdotool",
+        "search",
+        "--onlyvisible",
+        "--pid",
+        "20655",
+        "--name",
+        "LumenDesk"
+      ],
+      "exit_code": 1,
+      "duration_seconds": 0.008,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xdotool",
+        "search",
+        "--onlyvisible",
+        "--pid",
+        "20655",
+        "--name",
+        "LumenDesk"
+      ],
+      "exit_code": 1,
+      "duration_seconds": 0.011,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xdotool",
+        "search",
+        "--onlyvisible",
+        "--pid",
+        "20655",
+        "--name",
+        "LumenDesk"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.007,
+      "stdout": "4194307\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xdotool",
+        "windowactivate",
+        "--sync",
+        "4194307"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.04,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xdotool",
+        "getwindowgeometry",
+        "--shell",
+        "4194307"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.004,
+      "stdout": "WINDOW=4194307\nX=242\nY=194\nWIDTH=800\nHEIGHT=600\nSCREEN=0\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "import",
+        "-window",
+        "4194307",
+        "/tmp/lumendesk-native-evidence/minimized-close-initial.png"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.088,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tesseract",
+        "/tmp/lumendesk-native-evidence/minimized-close-initial.png",
+        "/tmp/lumendesk-native-evidence/minimized-close-initial",
+        "--psm",
+        "6"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.661,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xdotool",
+        "windowminimize",
+        "4194307"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.006,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xprop",
+        "-id",
+        "4194307",
+        "_NET_WM_STATE"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.004,
+      "stdout": "_NET_WM_STATE(ATOM) = _NET_WM_STATE_HIDDEN\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "wmctrl",
+        "-ic",
+        "0x400003"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.003,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xdotool",
+        "getwindowname",
+        "4194307"
+      ],
+      "exit_code": 1,
+      "duration_seconds": 0.006,
+      "stdout": "",
+      "stderr": "X Error of failed request:  BadWindow (invalid Window parameter)\n  Major opcode of failed request:  20 (X_GetProperty)\n  Resource id in failed request:  0x400003\n  Serial number of failed request:  22\n  Current serial number in output stream:  22\n"
+    }
+  ],
+  "pid": 20655,
+  "window": 4194307,
+  "alive_after_first_close": false,
+  "window_exists_after_first_close": false,
+  "status": "FAIL",
+  "error": "AssertionError()",
+  "log": "xkbcommon: ERROR: couldn't find a Compose file for locale \"C.UTF-8\" (mapped to \"C.UTF-8\")\n",
+  "finished_at": "2026-10-25T06:20:31.934348+00:00"
+}

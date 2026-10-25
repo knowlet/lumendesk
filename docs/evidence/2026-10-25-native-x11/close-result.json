@@ -1,0 +1,214 @@
+{
+  "scenario": "close",
+  "started_at": "2026-10-25T06:26:14.559035+00:00",
+  "git_head": "b0ef9ccfa2d8155425b8cf62d62b5781c3242fe2",
+  "git_status": " M README.md\n M crates/lumendesk/src/native.rs\n M docs/ACCEPTANCE.md\n M docs/PLATFORMS.md\n?? docs/evidence/2026-10-25-native-x11/\n?? scripts/verify-native-x11.py\n",
+  "native_source_sha256": "13d0f28d0f05f066a63ac31e14f157ce01f1ad36fee5c53559f9bc22c2cd9a05",
+  "cargo_lock_sha256": "2b63bc73de295dff584dbabc348672048a30470587756802bb4fb88159ffef0b",
+  "native_diff_sha256": "2bce0ae978971a954a5399c2b852a32aa6abb47cf0651e411414918e92b9fbf9",
+  "binary": "/workspace/lumendesk/target/debug/examples/native_form",
+  "display": ":92",
+  "smoke_ms": null,
+  "input_method": "xdotool X11 pointer/key events; EWMH WM close requests",
+  "steps": [
+    {
+      "command": [
+        "git",
+        "-C",
+        "/workspace/lumendesk",
+        "diff",
+        "--",
+        "crates/lumendesk/src/native.rs"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.002,
+      "stdout": "diff --git a/crates/lumendesk/src/native.rs b/crates/lumendesk/src/native.rs\nindex 34ef89b..b85e648 100644\n--- a/crates/lumendesk/src/native.rs\n+++ b/crates/lumendesk/src/native.rs\n@@ -80,8 +80,7 @@ struct FormApp {\n     close_attempts: usize,\n }\n impl eframe::App for FormApp {\n-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {\n-        let context = ui.ctx().clone();\n+    fn logic(&mut self, context: &egui::Context, _frame: &mut eframe::Frame) {\n         if context.input(|i| i.viewport().close_requested()) {\n             self.close_attempts += 1;\n             if self.reject_first_close && self.close_attempts == 1 {\n@@ -89,6 +88,9 @@ impl eframe::App for FormApp {\n                 eprintln!(\"lumendesk: first close cancelled\");\n             }\n         }\n+    }\n+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {\n+        let context = ui.ctx().clone();\n         egui::CentralPanel::default().show(ui, |ui| {\n             form_ui(ui, &mut self.state);\n         });\n@@ -174,6 +176,73 @@ mod tests {\n             }],\n         );\n     }\n+    fn close_test_app() -> FormApp {\n+        FormApp {\n+            state: FormState::default(),\n+            started: Instant::now(),\n+            smoke_after: None,\n+            reject_first_close: true,\n+            close_attempts: 0,\n+        }\n+    }\n+    fn close_input(minimized: bool) -> egui::RawInput {\n+        let mut input = egui::RawInput::default();\n+        let viewport = input.viewports.get_mut(&egui::ViewportId::ROOT).unwrap();\n+        viewport.minimized = Some(minimized);\n+        viewport.events.push(egui::ViewportEvent::Close);\n+        input\n+    }\n+    #[test]\n+    fn native_minimized_logic_cancels_first_close_only() {\n+        use eframe::App as _;\n+        let ctx = egui::Context::default();\n+        let mut app = close_test_app();\n+        let mut frame = eframe::Frame::_new_kittest();\n+        let input = close_input(true);\n+        let first = ctx.run_logic(&input, |ctx| app.logic(ctx, &mut frame));\n+        assert!(\n+            first\n+                .viewport_commands\n+                .get(&egui::ViewportId::ROOT)\n+                .is_some_and(|commands| commands.contains(&egui::ViewportCommand::CancelClose))\n+        );\n+        assert_eq!(app.close_attempts, 1);\n+        let mut idle = input.clone();\n+        idle.viewports\n+            .get_mut(&egui::ViewportId::ROOT)\n+            .unwrap()\n+            .events\n+            .clear();\n+        let _ = ctx.run_logic(&idle, |ctx| app.logic(ctx, &mut frame));\n+        assert_eq!(app.close_attempts, 1);\n+        let second = ctx.run_logic(&input, |ctx| app.logic(ctx, &mut frame));\n+        assert!(\n+            !second\n+                .viewport_commands\n+                .get(&egui::ViewportId::ROOT)\n+                .is_some_and(|commands| commands.contains(&egui::ViewportCommand::CancelClose))\n+        );\n+        assert_eq!(app.close_attempts, 2);\n+    }\n+    #[test]\n+    fn native_visible_logic_and_ui_count_each_close_once() {\n+        use eframe::App as _;\n+        let ctx = egui::Context::default();\n+        let mut app = close_test_app();\n+        let mut frame = eframe::Frame::_new_kittest();\n+        for attempt in 1..=2 {\n+            let output = ctx.run_ui(close_input(false), |ui| {\n+                app.logic(ui.ctx(), &mut frame);\n+                app.ui(ui, &mut frame);\n+            });\n+            let cancelled = output.viewport_output[&egui::ViewportId::ROOT]\n+                .commands\n+                .contains(&egui::ViewportCommand::CancelClose);\n+            assert_eq!(cancelled, attempt == 1);\n+            assert_eq!(app.close_attempts, attempt);\n+            output.drop_without_applying_deltas();\n+        }\n+    }\n     #[test]\n     fn native_view_click_and_disabled_semantics() {\n         let ctx = egui::Context::default();\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/workspace/lumendesk",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.001,
+      "stdout": "b0ef9ccfa2d8155425b8cf62d62b5781c3242fe2\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "git",
+        "-C",
+        "/workspace/lumendesk",
+        "status",
+        "--short"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.002,
+      "stdout": " M README.md\n M crates/lumendesk/src/native.rs\n M docs/ACCEPTANCE.md\n M docs/PLATFORMS.md\n?? docs/evidence/2026-10-25-native-x11/\n?? scripts/verify-native-x11.py\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xdotool",
+        "search",
+        "--onlyvisible",
+        "--pid",
+        "30813",
+        "--name",
+        "LumenDesk"
+      ],
+      "exit_code": 1,
+      "duration_seconds": 0.004,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xdotool",
+        "search",
+        "--onlyvisible",
+        "--pid",
+        "30813",
+        "--name",
+        "LumenDesk"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.011,
+      "stdout": "4194307\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xdotool",
+        "windowactivate",
+        "--sync",
+        "4194307"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.033,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xdotool",
+        "getwindowgeometry",
+        "--shell",
+        "4194307"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.002,
+      "stdout": "WINDOW=4194307\nX=242\nY=194\nWIDTH=800\nHEIGHT=600\nSCREEN=0\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "import",
+        "-window",
+        "4194307",
+        "/tmp/lumendesk-native-evidence/final/close-initial.png"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.036,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tesseract",
+        "/tmp/lumendesk-native-evidence/final/close-initial.png",
+        "/tmp/lumendesk-native-evidence/final/close-initial",
+        "--psm",
+        "6"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.204,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "wmctrl",
+        "-ic",
+        "0x400003"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.003,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xdotool",
+        "getwindowname",
+        "4194307"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.002,
+      "stdout": "LumenDesk · Native form\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "import",
+        "-window",
+        "4194307",
+        "/tmp/lumendesk-native-evidence/final/close-first-cancelled.png"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.038,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "tesseract",
+        "/tmp/lumendesk-native-evidence/final/close-first-cancelled.png",
+        "/tmp/lumendesk-native-evidence/final/close-first-cancelled",
+        "--psm",
+        "6"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.201,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "wmctrl",
+        "-ic",
+        "0x400003"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 0.003,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xdotool",
+        "getwindowname",
+        "4194307"
+      ],
+      "exit_code": 1,
+      "duration_seconds": 0.003,
+      "stdout": "",
+      "stderr": "X Error of failed request:  BadWindow (invalid Window parameter)\n  Major opcode of failed request:  20 (X_GetProperty)\n  Resource id in failed request:  0x400003\n  Serial number of failed request:  22\n  Current serial number in output stream:  22\n"
+    }
+  ],
+  "pid": 30813,
+  "binary_sha256": "b7e6724e173f3c7b9ee80e61f0932c7510bf533cd5137b31dc406193232f4e7c",
+  "window": 4194307,
+  "alive_after_first_close": true,
+  "window_exists_after_first_close": true,
+  "exit_code": 0,
+  "window_exists_after_exit": false,
+  "log": "xkbcommon: ERROR: couldn't find a Compose file for locale \"C.UTF-8\" (mapped to \"C.UTF-8\")\nlumendesk: first close cancelled\n",
+  "status": "PASS",
+  "observed_process_return_code": 0,
+  "finished_at": "2026-10-25T06:26:16.591348+00:00"
+}
