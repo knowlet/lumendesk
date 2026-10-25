@@ -1,5 +1,22 @@
 # Build and platform status
 
+## 2026-10-25 Codex Cloud native X11 acceptance
+
+On Debian 13.6 x86_64, an authenticated Xvfb/Openbox desktop ran the actual
+`native_form` with X11 pointer/keyboard input. Empty/whitespace disabled state,
+repeated submissions, Tab/Space activation, and visible/minimized close
+cancellation have [reproducible evidence](evidence/2026-10-25-native-x11/README.md).
+The minimized first-close defect was reproduced on `b0ef9cc` and corrected by
+processing lifecycle events in `App::logic`, including when no UI is painted.
+This does not establish Wayland, IME, accessibility or hardware GPU acceptance.
+
+All-feature builds and display-free tests use GTK 3.24.49 and WebKitGTK 2.54.0
+extracted into a local sysroot. The actual web examples could not load content:
+the production WebKit library requires a helper at an absent system path.
+Real Wry IPC, web input/repeated submit, stream cancel/close and WebKit child
+cleanup remain blocked. No runtime binaries, system paths or sandbox settings
+were changed to work around that boundary.
+
 ## Original local development environment
 
 - Linux x86_64, Debian 13 (trixie)
@@ -50,13 +67,15 @@ cargo run -p lumendesk --example web_form --features webview
 request. This switch is a test aid; web application code can install `on_close`.
 Native application code can handle close events through egui viewport commands.
 
-## Why graphical verification is pending
+## Historical display restriction
 
 A virtual X11 display was attempted, but this sandbox explicitly denies AF_UNIX
 socket creation with EPERM, including escalated execution. Xvfb cannot start its
 normal local display. We did not switch to a TCP display, disable sandboxing, or
 use a user's device. This also leaves WebKit child-process startup unverified.
 Headless egui input and JavaScript VM tests do not replace OS input tests.
+That historical socket denial does not apply to the 2026-10-25 environment
+above: its standard Xvfb sockets worked, allowing native X11 acceptance.
 
 ## Hosted cross-platform compile checks
 

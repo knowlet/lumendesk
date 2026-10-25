@@ -5,8 +5,9 @@ controls, system-webview windows, a typed JSON bridge, and project tooling.
 
 **This is a working first milestone with incomplete desktop acceptance.** CI at
 PR #1 commit `a90f4c2` passed Linux, macOS and Windows builds, linking and
-display-free contracts. Actual window rendering, OS input, Wry IPC and WebView
-security boundaries have not been verified. Simultaneous native and webview
+display-free contracts. Linux X11 native rendering, pointer/keyboard input and
+close cancellation now have [dated acceptance evidence](docs/evidence/2026-10-25-native-x11/README.md).
+Actual Wry IPC and WebView security boundaries remain unverified. Simultaneous native and webview
 windows in one process are not implemented yet. See the dated evidence in
 [platform notes](docs/PLATFORMS.md) and the current commit's Actions results.
 

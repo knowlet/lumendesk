@@ -1,0 +1,11 @@
+   Compiling lumendesk v0.1.0 (/workspace/lumendesk/crates/lumendesk)
+    Finished `test` profile [unoptimized] target(s) in 0.93s
+     Running unittests src/lib.rs (target/debug/deps/lumendesk-80a990616d4fdf4c)
+
+running 4 tests
+test native::tests::native_minimized_logic_cancels_first_close_only ... ok
+test native::tests::native_visible_logic_and_ui_count_each_close_once ... ok
+test native::tests::native_view_click_and_disabled_semantics ... ok
+test native::tests::native_keyboard_focus_and_activation ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.04s

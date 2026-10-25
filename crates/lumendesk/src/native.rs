@@ -80,8 +80,7 @@ struct FormApp {
     close_attempts: usize,
 }
 impl eframe::App for FormApp {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        let context = ui.ctx().clone();
+    fn logic(&mut self, context: &egui::Context, _frame: &mut eframe::Frame) {
         if context.input(|i| i.viewport().close_requested()) {
             self.close_attempts += 1;
             if self.reject_first_close && self.close_attempts == 1 {
@@ -89,6 +88,9 @@ impl eframe::App for FormApp {
                 eprintln!("lumendesk: first close cancelled");
             }
         }
+    }
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let context = ui.ctx().clone();
         egui::CentralPanel::default().show(ui, |ui| {
             form_ui(ui, &mut self.state);
         });
@@ -173,6 +175,73 @@ mod tests {
                 modifiers: Default::default(),
             }],
         );
+    }
+    fn close_test_app() -> FormApp {
+        FormApp {
+            state: FormState::default(),
+            started: Instant::now(),
+            smoke_after: None,
+            reject_first_close: true,
+            close_attempts: 0,
+        }
+    }
+    fn close_input(minimized: bool) -> egui::RawInput {
+        let mut input = egui::RawInput::default();
+        let viewport = input.viewports.get_mut(&egui::ViewportId::ROOT).unwrap();
+        viewport.minimized = Some(minimized);
+        viewport.events.push(egui::ViewportEvent::Close);
+        input
+    }
+    #[test]
+    fn native_minimized_logic_cancels_first_close_only() {
+        use eframe::App as _;
+        let ctx = egui::Context::default();
+        let mut app = close_test_app();
+        let mut frame = eframe::Frame::_new_kittest();
+        let input = close_input(true);
+        let first = ctx.run_logic(&input, |ctx| app.logic(ctx, &mut frame));
+        assert!(
+            first
+                .viewport_commands
+                .get(&egui::ViewportId::ROOT)
+                .is_some_and(|commands| commands.contains(&egui::ViewportCommand::CancelClose))
+        );
+        assert_eq!(app.close_attempts, 1);
+        let mut idle = input.clone();
+        idle.viewports
+            .get_mut(&egui::ViewportId::ROOT)
+            .unwrap()
+            .events
+            .clear();
+        let _ = ctx.run_logic(&idle, |ctx| app.logic(ctx, &mut frame));
+        assert_eq!(app.close_attempts, 1);
+        let second = ctx.run_logic(&input, |ctx| app.logic(ctx, &mut frame));
+        assert!(
+            !second
+                .viewport_commands
+                .get(&egui::ViewportId::ROOT)
+                .is_some_and(|commands| commands.contains(&egui::ViewportCommand::CancelClose))
+        );
+        assert_eq!(app.close_attempts, 2);
+    }
+    #[test]
+    fn native_visible_logic_and_ui_count_each_close_once() {
+        use eframe::App as _;
+        let ctx = egui::Context::default();
+        let mut app = close_test_app();
+        let mut frame = eframe::Frame::_new_kittest();
+        for attempt in 1..=2 {
+            let output = ctx.run_ui(close_input(false), |ui| {
+                app.logic(ui.ctx(), &mut frame);
+                app.ui(ui, &mut frame);
+            });
+            let cancelled = output.viewport_output[&egui::ViewportId::ROOT]
+                .commands
+                .contains(&egui::ViewportCommand::CancelClose);
+            assert_eq!(cancelled, attempt == 1);
+            assert_eq!(app.close_attempts, attempt);
+            output.drop_without_applying_deltas();
+        }
     }
     #[test]
     fn native_view_click_and_disabled_semantics() {
