@@ -34,6 +34,12 @@ pub const APP_ORIGIN: &str = if cfg!(target_os = "windows") {
 const APP_URL: &str = "lumendesk://app/index.html";
 const MAX_WIRE_BYTES: usize = 1024 * 1024;
 const QUEUE_SIZE: usize = 32;
+// Opt-in lifecycle-only diagnostics: never print URLs, tokens or IPC payloads.
+fn trace_webview(stage: &str) {
+    if std::env::var("LUMENDESK_WEB_TRACE").as_deref() == Ok("1") {
+        eprintln!("lumendesk web lifecycle: {stage}");
+    }
+}
 const CSP: &str = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
 
 #[derive(Clone, Debug)]
@@ -298,6 +304,7 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
             .with_devtools(false)
             .with_incognito(true)
             .with_custom_protocol("lumendesk".into(), move |_, request| {
+                trace_webview("asset request");
                 let response = wry::http::Response::builder()
                     .header("Content-Security-Policy", CSP)
                     .header("X-Content-Type-Options", "nosniff")
@@ -323,6 +330,11 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
             .with_navigation_handler(move |url| {
                 let allowed =
                     TrustedOrigin::parse(&origin_only(&url)).is_ok_and(|origin| origin == trusted);
+                trace_webview(if allowed {
+                    "navigation allowed"
+                } else {
+                    "navigation denied"
+                });
                 if allowed {
                     let _ = navigation_bridge.navigate(id);
                     let _ = navigation_proxy.send_event(UiMessage::Started(id));
@@ -333,6 +345,10 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
             .with_permission_handler(|_| wry::PermissionResponse::Deny)
             .with_download_started_handler(|_, _| false)
             .with_on_page_load_handler(move |event, url| {
+                trace_webview(match event {
+                    wry::PageLoadEvent::Started => "load started",
+                    wry::PageLoadEvent::Finished => "load finished",
+                });
                 let message = match event {
                     wry::PageLoadEvent::Started => UiMessage::Started(id),
                     wry::PageLoadEvent::Finished => UiMessage::Ready(id, url),
@@ -340,6 +356,7 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
                 let _ = page_proxy.send_event(message);
             })
             .with_ipc_handler(move |request| {
+                trace_webview("IPC received");
                 if request.body().len() > MAX_WIRE_BYTES {
                     return;
                 }
@@ -358,6 +375,7 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
                     top_level: true,
                 };
                 if ipc_bridge.authorize(&auth).is_err() {
+                    trace_webview("IPC denied");
                     return;
                 }
                 if let Command::Cancel(request_id) = &command {
@@ -442,6 +460,12 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
                                 .replace("__RUNTIME__", &runtime.to_string());
                             if window.view.evaluate_script(&script).is_ok() {
                                 window.session = Some(token);
+                                if std::env::var("LUMENDESK_WEB_TRACE").as_deref() == Ok("1") {
+                                    let _ = window.view.evaluate_script_with_callback(
+                                        "JSON.stringify({bridge:!!window.lumen,transport:!!window.ipc,fixture:!!document.getElementById('status'),ready:document.readyState})",
+                                        |value| eprintln!("lumendesk web bootstrap: {value}"),
+                                    );
+                                }
                             }
                         }
                         Err(error) => eprintln!("lumendesk: page session denied: {error}"),

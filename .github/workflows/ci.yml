@@ -52,7 +52,7 @@ jobs:
             openbox > /tmp/lumendesk-openbox.log 2>&1 &
             wm_pid=$!
             trap "kill $wm_pid 2>/dev/null || true" EXIT
-            python3 scripts/verify-webview-x11.py --output /tmp/lumendesk-webview.log
+            LUMENDESK_WEB_TRACE=1 python3 scripts/verify-webview-x11.py --output /tmp/lumendesk-webview.log
           '
       - name: Show WebView acceptance evidence
         if: always()
