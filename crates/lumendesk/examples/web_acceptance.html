@@ -1,0 +1,112 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LumenDesk Web Acceptance</title>
+<h1>Real WebView acceptance</h1><pre id="status">Waiting for the actual injected bridge…</pre>
+<script>
+'use strict';
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+async function until(predicate, message) {
+  const deadline = Date.now() + 4000;
+  while (Date.now() < deadline) { if (await predicate()) return; await delay(30); }
+  throw new Error(message);
+}
+let currentCase = 'repeated-ipc';
+async function check(name, body) {
+  currentCase = name;
+  await body();
+  await lumen.call('report', {case: name, ok: true, detail: ''});
+  document.querySelector('#status').textContent += '\nPASS ' + name;
+}
+window.addEventListener('lumendesk-ready', async () => {
+  try {
+    if (location.pathname === '/stage2') {
+      await check('navigation-cleanup', async () => {
+        assert(await lumen.call('phase', 'after'), 'new page must have a fresh request sequence');
+        await until(async () => (await lumen.call('stats', null)).stopped.includes('navigate'), 'navigation did not cancel its producer');
+      });
+      const closing = lumen.stream('numbers', {name: 'close', count: 10000});
+      assert((await closing.next()).value === 0, 'close producer did not start');
+      assert((await lumen.call('stats', null)).active.includes('close'), 'close producer already ended');
+      await lumen.call('ready', null);
+      return;
+    }
+    await check('repeated-ipc', async () => {
+      for (let sequence = 0; sequence < 64; sequence++) {
+        const value = await lumen.call('echo', {text: 'hello 世界', sequence});
+        assert(value.text === 'hello 世界' && value.sequence === sequence, 'IPC round trip changed data');
+      }
+    });
+    await check('event-payload', async () => {
+      const payload = 'quotes\" backslash\\ line\u2028paragraph\u2029 <script>not executed<\/script> 世界';
+      let received;
+      const unsubscribe = lumen.on('probe', value => { received = value; }, {once: true});
+      try {
+        await lumen.call('emit-probe', payload);
+        await until(() => received !== undefined, 'backend event was not injected');
+        assert(received === payload, 'event serialization changed its payload');
+      } finally { unsubscribe(); }
+    });
+    await check('schema-rejection', async () => {
+      let rejected = false;
+      try { await lumen.call('echo', {text: 'invalid', sequence: 'not an integer'}); }
+      catch (error) { rejected = error.code === 'invalid_arguments'; }
+      assert(rejected, 'invalid schema was not rejected by backend');
+      assert((await lumen.call('echo', {text: 'healthy', sequence: 65})).sequence === 65, 'rejected call poisoned bridge');
+    });
+    await check('stream-order', async () => {
+      const stream = lumen.stream('numbers', {name: 'ordered', count: 64});
+      let count = 0;
+      for await (const item of stream) assert(item === count++, 'stream ordering or duplication');
+      assert(count === 64 && await stream.result === 64, 'stream terminal result mismatch');
+    });
+    const controller = new AbortController();
+    const slow = lumen.stream('numbers', {name: 'slow', count: 10000}, {signal: controller.signal});
+    await check('backpressure', async () => {
+      assert((await slow.next()).value === 0, 'slow stream first item mismatch');
+      await until(async () => (await lumen.call('stats', null)).produced.slow === 17, 'producer did not reach queue capacity');
+      await delay(200);
+      const stats = await lumen.call('stats', null);
+      // One delivered item plus the host bounded queue of 16. No frontend pulls.
+      assert(stats.produced.slow > 1 && stats.produced.slow <= 17, 'producer escaped bounded queue');
+      assert(stats.active.includes('slow'), 'slow producer completed without demand');
+    });
+    await check('cancel-restart', async () => {
+      controller.abort();
+      let cancelled = false;
+      try { await slow.result; } catch (error) { cancelled = error.code === 'cancelled'; }
+      assert(cancelled, 'AbortSignal did not reject result');
+      await until(async () => (await lumen.call('stats', null)).stopped.includes('slow'), 'cancel did not stop producer');
+      const restarted = lumen.stream('numbers', {name: 'restart', count: 3});
+      let count = 0;
+      for await (const value of restarted) assert(value === count++, 'restart ordering mismatch');
+      assert(count === 3 && await restarted.result === 3, 'restart did not complete');
+    });
+    await check('frame-csp', async () => {
+      let blocked = false;
+      const listener = event => { if (event.effectiveDirective === 'frame-src' || event.effectiveDirective === 'child-src') blocked = true; };
+      document.addEventListener('securitypolicyviolation', listener);
+      const frame = document.createElement('iframe');
+      frame.src = new URL('/iframe.html', location.href).href;
+      document.body.appendChild(frame);
+      try { await until(() => blocked, 'engine did not enforce frame-src CSP'); }
+      finally { frame.remove(); document.removeEventListener('securitypolicyviolation', listener); }
+    });
+    await check('external-navigation', async () => {
+      const before = location.href;
+      // Local untrusted scheme: denial must not depend on DNS or a remote server.
+      location.href = 'about:blank';
+      await delay(300);
+      assert(location.href === before, 'external navigation was not denied');
+      assert((await lumen.call('echo', {text: 'still trusted', sequence: 66})).sequence === 66, 'denied navigation invalidated current bridge');
+    });
+    const navigating = lumen.stream('numbers', {name: 'navigate', count: 10000});
+    assert((await navigating.next()).value === 0, 'navigation producer did not start');
+    await lumen.call('phase', 'before');
+    location.href = new URL('/stage2', location.href).href;
+  } catch (error) {
+    document.querySelector('#status').textContent += '\nFAIL ' + String(error);
+    try { await lumen.call('report', {case: currentCase, ok: false, detail: String(error)}); } catch (_) {}
+  }
+}, {once: true});
+</script>

@@ -1,5 +1,9 @@
 # Isolated Linux GUI build dependencies
 
+Historical local evidence from October 2026, retained unchanged below. For later
+scoped hosted Linux WebKitGTK results, see [acceptance](../ACCEPTANCE.md).
+These local restrictions are not the current hosted-CI status.
+
 Prepared in `/workspace/scratch/c7703109bdb3/.cleanroom-tools` for Debian 13 x86_64. No system packages were installed and no system/security settings were changed. No application upstream source was accessed.
 
 ## Build environment

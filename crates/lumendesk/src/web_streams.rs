@@ -58,6 +58,9 @@ pub(crate) struct StreamBook {
     slots: BTreeMap<(WindowId, u64), Slot>,
 }
 impl StreamBook {
+    pub fn is_empty(&self) -> bool {
+        self.slots.is_empty()
+    }
     pub fn reserve(&mut self, auth: Authorization, id: u64) -> Result<(), CoreError> {
         if self.slots.len() >= MAX_STREAMS
             || self
