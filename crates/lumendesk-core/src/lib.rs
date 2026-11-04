@@ -11,7 +11,7 @@ pub mod schema;
 pub mod stream;
 
 pub use bridge::{
-    Authorization, Bridge, BridgeConfig, BridgeStreamReceiver, CallContext, CallRequest,
+    Authorization, Bridge, BridgeConfig, BridgeStreamReceiver, CallContext, CallJob, CallRequest,
     CallResponse, CancellationToken, SessionToken, StreamCall, StreamResponseItem, TrustedOrigin,
 };
 pub use events::{Event, EventBus, ListenerId};

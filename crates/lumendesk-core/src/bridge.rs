@@ -1,6 +1,9 @@
 //! The host supplies authorization separately from request JSON. Sessions are not
 //! a substitute for a trusted IPC transport: a frontend cannot attest its origin.
 //! Request IDs increase strictly within each session, starting at any integer.
+mod calls;
+pub use calls::CallJob;
+
 use crate::{
     CoreError, MethodSchema, Result, SchemaRegistry, StreamMethodSchema, StreamSink, WindowId,
 };
@@ -661,49 +664,7 @@ impl Bridge {
     }
 
     fn dispatch_inner(&self, auth: &Authorization, request: CallRequest) -> Result<Value> {
-        self.validate_request(&request)?;
-        let (handler, cancellation) = {
-            let mut state = self.0.state.lock().unwrap();
-            self.check_authorization(&mut state, auth)?;
-            let handler = state
-                .methods
-                .get(&request.method)
-                .cloned()
-                .ok_or_else(|| CoreError::UnknownMethod(request.method.clone()))?;
-            let session = self.check_authorization(&mut state, auth)?;
-            let cancellation = self.reserve_request(session, request.id)?;
-            (handler, cancellation)
-        };
-        let streams = Arc::new(Mutex::new(StreamScope::default()));
-        let context = CallContext {
-            window: auth.window,
-            request_id: request.id,
-            cancellation: cancellation.clone(),
-            streams: streams.clone(),
-        };
-        let result = catch_unwind(AssertUnwindSafe(|| handler(context, request.args)))
-            .unwrap_or(Err(CoreError::BackendPanic));
-        let mut result = self.bound_result(result);
-        {
-            let mut state = self.0.state.lock().unwrap();
-            if cancellation.is_cancelled() || self.check_authorization(&mut state, auth).is_err() {
-                result = Err(CoreError::Cancelled);
-            }
-            if let Some(Some(session)) = state.windows.get_mut(&auth.window)
-                && session.token == auth.session
-            {
-                session.pending.remove(&request.id);
-            }
-        }
-        let completions = {
-            let mut scope = streams.lock().unwrap();
-            scope.finished = true;
-            std::mem::take(&mut scope.completions)
-        };
-        for complete in completions {
-            complete(result.as_ref().map(|_| ()).map_err(Clone::clone));
-        }
-        result
+        self.begin_call_inner(auth, request)?.run().result
     }
 }
 
