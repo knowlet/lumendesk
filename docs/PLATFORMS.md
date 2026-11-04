@@ -75,7 +75,7 @@ The PR CI matrix includes standard `macos-15` (Apple Silicon) and
 and SDK library tests, builds the CLI, and compiles/links all native and webview
 examples with Rust 1.99.0. These macOS/Windows jobs do not launch an application
 window, request signing credentials, or publish a release. The separate Linux
-job also runs the real WebKitGTK fixture and uploads diagnostic artifacts. A configured job is not a verified
+job also runs the real WebKitGTK fixture and prints diagnostic logs. A configured job is not a verified
 result: consult the current commit's Actions run before claiming a platform pass.
 The table separates the original Debian baseline from the observed hosted CI
 results. The review revision also runs CLI library and portable-archive tests on
