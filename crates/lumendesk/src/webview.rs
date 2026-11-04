@@ -375,7 +375,12 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
         let view = {
             use tao::platform::unix::WindowExtUnix;
             use wry::WebViewBuilderExtUnix;
-            builder.build_gtk(window.gtk_window()).map_err(backend)?
+            // Tao's GtkApplicationWindow already contains its default GtkBox.
+            // GtkBin accepts one child, so attach the view to that existing box.
+            let container = window.default_vbox().ok_or_else(|| {
+                DesktopError::Backend("Tao window is missing its default GTK container".into())
+            })?;
+            builder.build_gtk(container).map_err(backend)?
         };
         #[cfg(not(target_os = "linux"))]
         let view = builder.build(&window).map_err(backend)?;

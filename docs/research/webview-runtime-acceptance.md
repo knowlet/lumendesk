@@ -50,3 +50,14 @@ WebKit tests. The real engine fixture covers CSP frame denial, not arbitrary
 hostile iframe IPC. The untrusted navigation target is local `about:blank` to
 avoid external network/DNS dependence. Event delivery includes quotes,
 backslashes, Unicode separators and HTML-looking text.
+
+## Defect found by the first real-engine run
+
+[CI run 41784512294](https://github.com/knowlet/lumendesk/actions/runs/41784512294)
+compiled on all three platforms and passed the existing suites, but the first
+Linux runtime attempt timed out before any bridge assertion. GTK reported that
+`GtkApplicationWindow` already contained a `GtkBox` and could not accept a second
+child. Tao creates that box by default; `WindowExtUnix::default_vbox` exposes it.
+The Linux adapter must pass the existing box to Wry `build_gtk`, rather than
+trying to insert a WebView as another direct child of the window. The new
+acceptance fixture is the regression test; no sandbox or CSP policy is relaxed.
