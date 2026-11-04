@@ -166,9 +166,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 || !state.navigated
                 || !state.active.contains("close")
             {
-                return Err(CoreError::InvalidResult(
-                    "incomplete acceptance evidence".into(),
-                ));
+                return Err(CoreError::Backend("incomplete acceptance evidence".into()));
             }
             state.ready = true;
             println!("LUMENDESK_WEB_READY_TO_CLOSE");

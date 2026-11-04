@@ -92,3 +92,11 @@ use `shell=False`. Tests execute a filename with shell metacharacters literally,
 reject malformed/signed/option-like IDs, exclude unrelated PIDs, and require the
 fake WM to receive the exact close option and expected ID before signaling.
 These are command-construction checks, not a sandbox for untrusted executables.
+
+The runner also bounds pipe draining to 200ms after the application exits:
+WebKit helpers may inherit stdout/stderr, so helper EOF is not application
+completion. An actual inherited-pipe helper reproduces the old false close
+timeout; tests now require success only with exit zero and the full handshake,
+and separately reject missing PASS and nonzero exit. Owned-group cleanup stops
+the helper in all three cases. The wake tests additionally cover active to idle
+to active transitions, with no periodic tick during the idle interval.

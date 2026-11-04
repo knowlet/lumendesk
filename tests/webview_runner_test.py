@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import tempfile
 import subprocess
+import time
 import unittest
 from unittest.mock import patch
 
@@ -72,6 +73,67 @@ while True: time.sleep(0.02)
         self.write_success_app()
         runner.run(self.binary, 2, 1, self.log)
         self.assertIn(runner.PASS, self.log.read_text())
+
+    def run_inherited_pipes_fixture(self, *, emit_pass=True, exit_code=0):
+        helper_pid = self.root / "helper-pid"
+        owner_pid = self.root / "owner-pid"
+        helper_source = (
+            "import os,time; from pathlib import Path; "
+            f"Path({str(helper_pid)!r}).write_text(str(os.getpid())+' '+str(os.getpgrp())); "
+            "time.sleep(60)"
+        )
+        self.write(self.binary, f"""import os, signal, subprocess, sys, time
+from pathlib import Path
+p = Path(os.environ["FIXTURE_PID"])
+p.write_text(str(os.getpid()))
+Path({str(owner_pid)!r}).write_text(str(os.getpid()))
+# Deliberately inherit stdout/stderr and the app's process group.
+helper = subprocess.Popen([sys.executable, "-c", {helper_source!r}], shell=False)
+while not Path({str(helper_pid)!r}).exists(): time.sleep(0.005)
+def close(*_):
+    p.unlink()
+    if {emit_pass!r}: print("LUMENDESK_WEB_ACCEPTANCE_PASS", flush=True)
+    raise SystemExit({exit_code})
+signal.signal(signal.SIGUSR1, close)
+print("LUMENDESK_WEB_READY_TO_CLOSE", flush=True)
+while True: time.sleep(0.02)
+""")
+        started = time.monotonic()
+        try:
+            runner.run(self.binary, 2, 1, self.log)
+        finally:
+            self.assertLess(time.monotonic() - started, 2)
+            pid, group = map(int, helper_pid.read_text().split())
+            self.assertEqual(group, int(owner_pid.read_text()))
+            # A killed orphan may briefly remain a zombie until init reaps it.
+            end = time.monotonic() + 1
+            while time.monotonic() < end:
+                status = Path(f"/proc/{pid}/stat")
+                if not status.exists():
+                    break
+                try:
+                    if status.read_text().split(")", 1)[1].split()[0] == "Z":
+                        break
+                except FileNotFoundError:
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("owned helper remains alive after runner cleanup")
+
+    @unittest.skipUnless(Path("/proc/self/stat").exists(), "Linux process lifecycle check")
+    def test_inherited_pipes_do_not_require_eof_and_helper_is_stopped(self):
+        self.run_inherited_pipes_fixture()
+        self.assertIn(runner.PASS, self.log.read_text())
+
+    @unittest.skipUnless(Path("/proc/self/stat").exists(), "Linux process lifecycle check")
+    def test_inherited_pipes_without_pass_still_fail_and_stop_helper(self):
+        with self.assertRaisesRegex(runner.AcceptanceError, "complete acceptance handshake"):
+            self.run_inherited_pipes_fixture(emit_pass=False)
+
+    @unittest.skipUnless(Path("/proc/self/stat").exists(), "Linux process lifecycle check")
+    def test_inherited_pipes_with_nonzero_exit_still_fail_and_stop_helper(self):
+        with self.assertRaisesRegex(runner.AcceptanceError, "application exited 7"):
+            self.run_inherited_pipes_fixture(exit_code=7)
 
     def test_shell_metacharacters_in_binary_path_are_literal(self):
         self.binary = self.root / "app 'quoted'; touch SHELL_EXECUTED; # $(echo boom)"

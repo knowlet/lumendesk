@@ -26,6 +26,7 @@ import time
 READY = "LUMENDESK_WEB_READY_TO_CLOSE"
 PASS = "LUMENDESK_WEB_ACCEPTANCE_PASS"
 MAX_LOG_BYTES = 4 * 1024 * 1024
+EXIT_DRAIN_SECONDS = 0.2
 FORBIDDEN_ENV = (
     "LUMENDESK_SMOKE_MS",
     "WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS",
@@ -103,6 +104,7 @@ def run(binary: Path, timeout: float, close_timeout: float, output: Path | None)
     passed = False
     closed = False
     deadline = time.monotonic() + timeout
+    exit_observed = None
     assert process.stdout is not None and process.stderr is not None
     for name, pipe in (("stdout", process.stdout), ("stderr", process.stderr)):
         os.set_blocking(pipe.fileno(), False)
@@ -110,10 +112,24 @@ def run(binary: Path, timeout: float, close_timeout: float, output: Path | None)
     try:
         while True:
             now = time.monotonic()
-            if now >= deadline:
-                phase = "normal window close" if closed else "WebView assertion readiness"
-                raise AcceptanceError(f"timed out waiting for {phase}")
-            for key, _ in selector.select(min(0.05, deadline - now)):
+            if process.poll() is not None and exit_observed is None:
+                exit_observed = now
+            if exit_observed is None:
+                if now >= deadline:
+                    phase = "normal window close" if closed else "WebView assertion readiness"
+                    raise AcceptanceError(f"timed out waiting for {phase}")
+                read_deadline = deadline
+            else:
+                # WebKit helpers can inherit both pipes after the app has exited.
+                # Drain final buffered markers briefly, but do not require helper EOF.
+                read_deadline = exit_observed + EXIT_DRAIN_SECONDS
+                if not selector.get_map() or now >= read_deadline:
+                    if process.returncode != 0:
+                        raise AcceptanceError(f"application exited {process.returncode}")
+                    if not (ready and closed and passed):
+                        raise AcceptanceError("application exited without the complete acceptance handshake")
+                    break
+            for key, _ in selector.select(min(0.05, read_deadline - now)):
                 chunk = os.read(key.fileobj.fileno(), 65536)
                 if not chunk:
                     selector.unregister(key.fileobj)
@@ -134,13 +150,7 @@ def run(binary: Path, timeout: float, close_timeout: float, output: Path | None)
                             if not closed:
                                 raise AcceptanceError("PASS was reported before normal close")
                             passed = True
-            if process.poll() is not None and not selector.get_map():
-                if process.returncode != 0:
-                    raise AcceptanceError(f"application exited {process.returncode}")
-                if not (ready and closed and passed):
-                    raise AcceptanceError("application exited without the complete acceptance handshake")
-                break
-            if ready and not closed:
+            if ready and not closed and process.poll() is None:
                 windows = windows_for_pid(wmctrl, process.pid)
                 if len(windows) > 1:
                     raise AcceptanceError("expected exactly one application window")
