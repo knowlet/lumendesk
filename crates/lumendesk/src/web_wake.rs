@@ -129,4 +129,34 @@ mod tests {
             Err(mpsc::RecvTimeoutError::Disconnected)
         );
     }
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn ticker_parks_again_and_resumes_after_activity() {
+        use std::{sync::mpsc, time::Duration};
+        let (tx, rx) = mpsc::channel();
+        let (resume, paused) = mpsc::channel();
+        let first = AtomicBool::new(true);
+        let ticker = WakeTicker::new(Duration::from_millis(5), move || {
+            if tx.send(()).is_err() {
+                return false;
+            }
+            if first.swap(false, Ordering::AcqRel) {
+                paused.recv().unwrap();
+            }
+            true
+        });
+        let activity = ticker.activity();
+        activity.set_active(true);
+        rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        // Deactivate while the first callback is held, then let it finish.
+        activity.set_active(false);
+        resume.send(()).unwrap();
+        assert_eq!(
+            rx.recv_timeout(Duration::from_millis(50)),
+            Err(mpsc::RecvTimeoutError::Timeout)
+        );
+        activity.set_active(true);
+        rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        drop(ticker);
+    }
 }

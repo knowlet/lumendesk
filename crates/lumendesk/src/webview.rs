@@ -237,11 +237,6 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
     let mut open = BTreeMap::new();
     let wake_signal = WakeSignal::default();
     let event_state = app.sender.state.clone();
-    let event_proxy = event_loop.create_proxy();
-    let event_wake = wake_signal.clone();
-    event_state.lock().unwrap().wake = Some(Box::new(move || {
-        event_wake.request(|| event_proxy.send_event(UiMessage::Wake).is_ok());
-    }));
     let call_budget = WorkBudget::default();
     let stream_budget = WorkBudget::default();
     let mut streams = StreamBook::default();
@@ -413,6 +408,11 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
             },
         );
     }
+    let event_proxy = event_loop.create_proxy();
+    let event_wake = wake_signal.clone();
+    event_state.lock().unwrap().wake = Some(Box::new(move || {
+        event_wake.request(|| event_proxy.send_event(UiMessage::Wake).is_ok());
+    }));
     let started = Instant::now();
     let smoke = std::env::var("LUMENDESK_SMOKE_MS")
         .ok()
