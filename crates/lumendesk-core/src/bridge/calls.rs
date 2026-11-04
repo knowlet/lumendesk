@@ -1,7 +1,5 @@
 //! Ordered admission is separate from host-owned worker scheduling.
-use super::{
-    Authorization, Bridge, CallContext, CallRequest, CallResponse, Handler, StreamScope,
-};
+use super::{Authorization, Bridge, CallContext, CallRequest, CallResponse, Handler, StreamScope};
 use crate::{CoreError, Result};
 use serde_json::Value;
 use std::{
@@ -112,7 +110,10 @@ impl CallJob {
         {
             let mut state = self.bridge.0.state.lock().unwrap();
             if self.context.cancellation.is_cancelled()
-                || self.bridge.check_authorization(&mut state, &self.auth).is_err()
+                || self
+                    .bridge
+                    .check_authorization(&mut state, &self.auth)
+                    .is_err()
             {
                 result = Err(CoreError::Cancelled);
             }

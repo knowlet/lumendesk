@@ -74,7 +74,14 @@ fn synchronous_dispatch_still_requires_admission_order() {
 fn admitted_jobs_execute_in_every_three_job_permutation() {
     fn assert_send<T: Send>() {}
     assert_send::<CallJob>();
-    for order in [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]] {
+    for order in [
+        [0, 1, 2],
+        [0, 2, 1],
+        [1, 0, 2],
+        [1, 2, 0],
+        [2, 0, 1],
+        [2, 1, 0],
+    ] {
         let (bridge, auth, count) = fixture(3);
         let mut jobs: Vec<_> = (1..=3)
             .map(|id| Some(bridge.begin_call(&auth, echo(id)).unwrap()))
@@ -91,7 +98,14 @@ fn admitted_jobs_execute_in_every_three_job_permutation() {
             assert_eq!(response.result, Ok(echo(id).args));
         }
         assert_eq!(count.load(Ordering::SeqCst), 3);
-        assert!(bridge.begin_call(&auth, echo(4)).unwrap().run().result.is_ok());
+        assert!(
+            bridge
+                .begin_call(&auth, echo(4))
+                .unwrap()
+                .run()
+                .result
+                .is_ok()
+        );
     }
 }
 
@@ -155,21 +169,37 @@ fn calls_and_streams_share_ids_and_pending_budget() {
     let (producer, receiver) = bridge
         .begin_stream(&auth, request(2, "count", Value::Null), 1)
         .unwrap();
-    assert_eq!(bridge.begin_call(&auth, echo(3)).unwrap_err(), CoreError::QueueFull);
+    assert_eq!(
+        bridge.begin_call(&auth, echo(3)).unwrap_err(),
+        CoreError::QueueFull
+    );
     drop(first);
     let third = bridge.begin_call(&auth, echo(3)).unwrap();
     producer.run();
-    assert_eq!(bridge.begin_call(&auth, echo(4)).unwrap_err(), CoreError::QueueFull);
+    assert_eq!(
+        bridge.begin_call(&auth, echo(4)).unwrap_err(),
+        CoreError::QueueFull
+    );
     assert_eq!(third.run().result, Ok(echo(3).args));
     assert_eq!(
         receiver.try_next().unwrap(),
-        Some(StreamResponseItem::Value { sequence: 0, value: json!(7) })
+        Some(StreamResponseItem::Value {
+            sequence: 0,
+            value: json!(7)
+        })
     );
     assert_eq!(
         receiver.try_next().unwrap(),
         Some(StreamResponseItem::Complete(Ok(Value::Null)))
     );
-    assert!(bridge.begin_call(&auth, echo(4)).unwrap().run().result.is_ok());
+    assert!(
+        bridge
+            .begin_call(&auth, echo(4))
+            .unwrap()
+            .run()
+            .result
+            .is_ok()
+    );
 }
 
 #[test]
@@ -189,7 +219,14 @@ fn dropping_unrun_jobs_releases_budget_without_reusing_ids() {
         assert_eq!(bridge.cancel(&auth, id), Ok(false));
     }
     assert_eq!(count.load(Ordering::SeqCst), 0);
-    assert!(bridge.begin_call(&auth, echo(101)).unwrap().run().result.is_ok());
+    assert!(
+        bridge
+            .begin_call(&auth, echo(101))
+            .unwrap()
+            .run()
+            .result
+            .is_ok()
+    );
 }
 
 #[test]
@@ -198,23 +235,43 @@ fn cancellation_before_run_suppresses_handler_and_releases_only_on_exit() {
     let job = bridge.begin_call(&auth, echo(1)).unwrap();
     assert_eq!(bridge.cancel(&auth, 1), Ok(true));
     assert_eq!(bridge.is_request_cancelled(&auth, 1), Ok(true));
-    assert_eq!(bridge.begin_call(&auth, echo(2)).unwrap_err(), CoreError::QueueFull);
+    assert_eq!(
+        bridge.begin_call(&auth, echo(2)).unwrap_err(),
+        CoreError::QueueFull
+    );
     assert_eq!(job.run().result, Err(CoreError::Cancelled));
     assert_eq!(count.load(Ordering::SeqCst), 0);
-    assert!(bridge.begin_call(&auth, echo(2)).unwrap().run().result.is_ok());
+    assert!(
+        bridge
+            .begin_call(&auth, echo(2))
+            .unwrap()
+            .run()
+            .result
+            .is_ok()
+    );
 }
 
 #[test]
 fn precancellation_is_shared_with_admission_and_does_not_execute() {
     let (bridge, auth, count) = fixture(1);
     assert_eq!(bridge.cancel(&auth, 1), Ok(true));
-    assert_eq!(bridge.begin_call(&auth, echo(1)).unwrap_err(), CoreError::Cancelled);
+    assert_eq!(
+        bridge.begin_call(&auth, echo(1)).unwrap_err(),
+        CoreError::Cancelled
+    );
     assert_eq!(count.load(Ordering::SeqCst), 0);
     assert_eq!(
         bridge.begin_call(&auth, echo(1)).unwrap_err(),
         CoreError::ReusedRequestId
     );
-    assert!(bridge.begin_call(&auth, echo(2)).unwrap().run().result.is_ok());
+    assert!(
+        bridge
+            .begin_call(&auth, echo(2))
+            .unwrap()
+            .run()
+            .result
+            .is_ok()
+    );
 }
 
 #[test]
@@ -241,10 +298,20 @@ fn cancelled_running_handler_keeps_its_budget_until_it_returns() {
     let token = started_rx.recv_timeout(WAIT).unwrap();
     bridge.cancel(&auth, 1).unwrap();
     assert!(token.is_cancelled());
-    assert_eq!(bridge.begin_call(&auth, echo(2)).unwrap_err(), CoreError::QueueFull);
+    assert_eq!(
+        bridge.begin_call(&auth, echo(2)).unwrap_err(),
+        CoreError::QueueFull
+    );
     release_tx.send(()).unwrap();
     assert_eq!(worker.join().unwrap().result, Err(CoreError::Cancelled));
-    assert!(bridge.begin_call(&auth, echo(2)).unwrap().run().result.is_ok());
+    assert!(
+        bridge
+            .begin_call(&auth, echo(2))
+            .unwrap()
+            .run()
+            .result
+            .is_ok()
+    );
 }
 
 #[test]
@@ -269,7 +336,14 @@ fn stale_job_cleanup_never_releases_replacement_sessions_reservation() {
                 CoreError::QueueFull
             );
             assert_eq!(fresh.run().result, Ok(echo(1).args));
-            assert!(bridge.begin_call(&fresh_auth, echo(2)).unwrap().run().result.is_ok());
+            assert!(
+                bridge
+                    .begin_call(&fresh_auth, echo(2))
+                    .unwrap()
+                    .run()
+                    .result
+                    .is_ok()
+            );
             assert_eq!(count.load(Ordering::SeqCst), 2);
         }
     }
@@ -297,14 +371,30 @@ fn rejected_authority_does_not_consume_id_or_capacity() {
     let other = session(&bridge, 2);
     let mut forged = auth.clone();
     forged.top_level = false;
-    assert_eq!(bridge.begin_call(&forged, echo(1)).unwrap_err(), CoreError::Unauthorized);
+    assert_eq!(
+        bridge.begin_call(&forged, echo(1)).unwrap_err(),
+        CoreError::Unauthorized
+    );
     forged = auth.clone();
     forged.page_url = "lumendesk://app.evil/".into();
-    assert_eq!(bridge.begin_call(&forged, echo(1)).unwrap_err(), CoreError::Unauthorized);
+    assert_eq!(
+        bridge.begin_call(&forged, echo(1)).unwrap_err(),
+        CoreError::Unauthorized
+    );
     forged = auth.clone();
     forged.session = other.session;
-    assert_eq!(bridge.begin_call(&forged, echo(1)).unwrap_err(), CoreError::StaleSession);
-    assert!(bridge.begin_call(&auth, echo(1)).unwrap().run().result.is_ok());
+    assert_eq!(
+        bridge.begin_call(&forged, echo(1)).unwrap_err(),
+        CoreError::StaleSession
+    );
+    assert!(
+        bridge
+            .begin_call(&auth, echo(1))
+            .unwrap()
+            .run()
+            .result
+            .is_ok()
+    );
     assert_eq!(count.load(Ordering::SeqCst), 1);
 }
 
@@ -344,11 +434,23 @@ fn wire_validation_is_bounded_and_admission_errors_do_not_reserve() {
 #[test]
 fn schema_rejection_happens_without_user_code_and_releases_reservation() {
     let (bridge, auth, count) = fixture(1);
-    let job = bridge.begin_call(&auth, request(1, "echo", json!(12))).unwrap();
+    let job = bridge
+        .begin_call(&auth, request(1, "echo", json!(12)))
+        .unwrap();
     assert_eq!(count.load(Ordering::SeqCst), 0);
-    assert!(matches!(job.run().result, Err(CoreError::InvalidArguments(_))));
+    assert!(matches!(
+        job.run().result,
+        Err(CoreError::InvalidArguments(_))
+    ));
     assert_eq!(count.load(Ordering::SeqCst), 0);
-    assert!(bridge.begin_call(&auth, echo(2)).unwrap().run().result.is_ok());
+    assert!(
+        bridge
+            .begin_call(&auth, echo(2))
+            .unwrap()
+            .run()
+            .result
+            .is_ok()
+    );
 }
 
 #[test]
@@ -373,16 +475,31 @@ fn result_schema_and_success_error_payload_bounds_survive_scheduling() {
         )
         .unwrap();
     assert!(matches!(
-        bridge.begin_call(&auth, request(1, "bad", Value::Null)).unwrap().run().result,
+        bridge
+            .begin_call(&auth, request(1, "bad", Value::Null))
+            .unwrap()
+            .run()
+            .result,
         Err(CoreError::InvalidResult(_))
     ));
     for (id, method) in [(2, "large"), (3, "error")] {
         assert_eq!(
-            bridge.begin_call(&auth, request(id, method, Value::Null)).unwrap().run().result,
+            bridge
+                .begin_call(&auth, request(id, method, Value::Null))
+                .unwrap()
+                .run()
+                .result,
             Err(CoreError::PayloadTooLarge)
         );
     }
-    assert!(bridge.begin_call(&auth, echo(4)).unwrap().run().result.is_ok());
+    assert!(
+        bridge
+            .begin_call(&auth, echo(4))
+            .unwrap()
+            .run()
+            .result
+            .is_ok()
+    );
 }
 
 #[test]
@@ -400,20 +517,35 @@ fn panic_finishes_call_scoped_streams_and_releases_capacity() {
             },
         )
         .unwrap();
-    let job = bridge.begin_call(&auth, request(1, "panic", Value::Null)).unwrap();
+    let job = bridge
+        .begin_call(&auth, request(1, "panic", Value::Null))
+        .unwrap();
     assert_eq!(job.run().result, Err(CoreError::BackendPanic));
     let (sender, receiver, context) = retained_rx.recv_timeout(WAIT).unwrap();
     assert_eq!(sender.send(8), Err(CoreError::StreamFinished));
-    assert!(matches!(context.stream::<u8>(1), Err(CoreError::StreamFinished)));
+    assert!(matches!(
+        context.stream::<u8>(1),
+        Err(CoreError::StreamFinished)
+    ));
     assert_eq!(
         receiver.try_next().unwrap(),
-        Some(StreamItem::Value { sequence: 0, value: 7 })
+        Some(StreamItem::Value {
+            sequence: 0,
+            value: 7
+        })
     );
     assert_eq!(
         receiver.try_next().unwrap(),
         Some(StreamItem::Complete(Err(CoreError::BackendPanic)))
     );
-    assert!(bridge.begin_call(&auth, echo(2)).unwrap().run().result.is_ok());
+    assert!(
+        bridge
+            .begin_call(&auth, echo(2))
+            .unwrap()
+            .run()
+            .result
+            .is_ok()
+    );
 }
 
 #[test]
