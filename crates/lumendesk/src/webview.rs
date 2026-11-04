@@ -5,6 +5,7 @@ use crate::core::{
     CoreError, Field, MethodSchema, Schema, SessionToken, TrustedOrigin, WindowId,
 };
 use crate::web_streams::{MAX_STREAMS, StreamBook, WorkBudget, WorkPermit};
+use crate::web_wake::WakeSignal;
 use crate::{DesktopError, FormState, WindowOptions};
 use serde::Deserialize;
 use serde_json::Value;
@@ -179,6 +180,7 @@ impl WebApplication {
     }
 }
 enum UiMessage {
+    Wake,
     Started(WindowId),
     Ready(WindowId, String),
     Response(WindowId, SessionToken, CallResponse),
@@ -235,6 +237,7 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
     }
     let mut event_loop = EventLoopBuilder::<UiMessage>::with_user_event().build();
     let mut open = BTreeMap::new();
+    let wake_signal = WakeSignal::default();
     let call_budget = WorkBudget::default();
     let stream_budget = WorkBudget::default();
     let mut streams = StreamBook::default();
@@ -299,6 +302,8 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
         });
         let ipc_bridge = app.bridge.clone();
         let page_proxy = event_loop.create_proxy();
+        let command_proxy = event_loop.create_proxy();
+        let command_wake = wake_signal.clone();
         let builder = WebViewBuilder::new()
             .with_url(APP_URL)
             .with_devtools(false)
@@ -387,6 +392,8 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
                     // The trusted runtime has a smaller pending limit. Raw IPC flooding
                     // is dropped instead of allocating unbounded event-loop messages.
                     eprintln!("lumendesk: incoming IPC queue full; request will time out");
+                } else {
+                    command_wake.request(|| command_proxy.send_event(UiMessage::Wake).is_ok());
                 }
             });
         #[cfg(target_os = "linux")]
@@ -420,9 +427,20 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
         .and_then(|s| s.parse::<u64>().ok())
         .map(Duration::from_millis);
     let cancel_first = std::env::var_os("LUMENDESK_CANCEL_FIRST_CLOSE").is_some();
+    // Tao's Linux WaitUntil does not arm a GTK timeout. An actual wake source
+    // is required for idle stream/event queues; coalescing bounds queued ticks.
+    #[cfg(target_os = "linux")]
+    let _ticker = {
+        let proxy = event_loop.create_proxy();
+        let signal = wake_signal.clone();
+        crate::web_wake::WakeTicker::new(Duration::from_millis(30), move || {
+            signal.request(|| proxy.send_event(UiMessage::Wake).is_ok())
+        })
+    };
     event_loop.run_return(move |event, _, flow| {
         *flow = ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(30));
         match event {
+            Event::UserEvent(UiMessage::Wake) => wake_signal.acknowledge(),
             Event::WindowEvent { window_id, event: WindowEvent::CloseRequested, .. } => {
                 let id = open.iter().find(|(_, window)| window.window.id() == window_id).map(|(id, _)| *id);
                 if let Some(id) = id {

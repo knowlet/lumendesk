@@ -61,3 +61,13 @@ child. Tao creates that box by default; `WindowExtUnix::default_vbox` exposes it
 The Linux adapter must pass the existing box to Wry `build_gtk`, rather than
 trying to insert a WebView as another direct child of the window. The new
 acceptance fixture is the regression test; no sandbox or CSP policy is relaxed.
+
+The lifecycle trace in [run 41786420674](https://github.com/knowlet/lumendesk/actions/runs/41786420674)
+then confirmed the page, injected runtime and transport were loaded, but RPC
+progress stalled while GTK was idle. The exact locked
+[Tao 0.35.3 Linux event loop](https://github.com/tauri-apps/tao/blob/tao-v0.35.3/src/platform_impl/linux/event_loop.rs)
+checks `WaitUntil` before a blocking GTK iteration without arming a wake timer.
+IPC had only queued an mpsc command. The adapter now sends a coalesced proxy wake
+on accepted IPC and uses a stoppable 30ms Linux wake ticker for streams/events.
+At most one wake is pending; teardown unparks and joins the ticker. This preserves
+the existing 30ms polling intent without a busy `ControlFlow::Poll` loop.
