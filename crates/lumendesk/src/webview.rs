@@ -44,6 +44,7 @@ struct HostEvent {
 }
 #[derive(Default)]
 struct EventState {
+    wake: Option<Box<dyn Fn() + Send>>,
     queues: BTreeMap<WindowId, VecDeque<HostEvent>>,
     schemas: BTreeMap<String, Schema>,
 }
@@ -92,6 +93,9 @@ impl EventSender {
                 name: name.clone(),
                 payload: payload.clone(),
             });
+        }
+        if let Some(wake) = &state.wake {
+            wake();
         }
         Ok(())
     }
@@ -232,6 +236,12 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
     let mut event_loop = EventLoopBuilder::<UiMessage>::with_user_event().build();
     let mut open = BTreeMap::new();
     let wake_signal = WakeSignal::default();
+    let event_state = app.sender.state.clone();
+    let event_proxy = event_loop.create_proxy();
+    let event_wake = wake_signal.clone();
+    event_state.lock().unwrap().wake = Some(Box::new(move || {
+        event_wake.request(|| event_proxy.send_event(UiMessage::Wake).is_ok());
+    }));
     let call_budget = WorkBudget::default();
     let stream_budget = WorkBudget::default();
     let mut streams = StreamBook::default();
@@ -410,17 +420,18 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
         .map(Duration::from_millis);
     let cancel_first = std::env::var_os("LUMENDESK_CANCEL_FIRST_CLOSE").is_some();
     // Tao's Linux WaitUntil does not arm a GTK timeout. An actual wake source
-    // is required for idle stream/event queues; coalescing bounds queued ticks.
+    // is needed while streams are live; idle apps park until IPC/events arrive.
     #[cfg(target_os = "linux")]
-    let _ticker = {
+    let ticker = {
         let proxy = event_loop.create_proxy();
         let signal = wake_signal.clone();
         crate::web_wake::WakeTicker::new(Duration::from_millis(30), move || {
             signal.request(|| proxy.send_event(UiMessage::Wake).is_ok())
         })
     };
+    #[cfg(target_os = "linux")]
+    let activity = ticker.activity();
     event_loop.run_return(move |event, _, flow| {
-        *flow = ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(30));
         match event {
             Event::UserEvent(UiMessage::Wake) => wake_signal.acknowledge(),
             Event::WindowEvent { window_id, event: WindowEvent::CloseRequested, .. } => {
@@ -460,7 +471,6 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
                                 .replace("__RUNTIME__", &runtime.to_string());
                             if window.view.evaluate_script(&script).is_ok() {
                                 window.session = Some(token);
-
                             }
                         }
                         Err(error) => eprintln!("lumendesk: page session denied: {error}"),
@@ -502,10 +512,18 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
             }
             _ => {}
         }
-        if open.is_empty() {
-            *flow = ControlFlow::Exit;
-        }
+        let polling = !streams.is_empty() || smoke.is_some();
+        #[cfg(target_os = "linux")]
+        activity.set_active(polling);
+        *flow = if open.is_empty() {
+            ControlFlow::Exit
+        } else if polling {
+            ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(30))
+        } else {
+            ControlFlow::Wait
+        };
     });
+    event_state.lock().unwrap().wake = None;
     Ok(())
 }
 // Bind at JavaScript execution time as well as host enqueue time. Engine script

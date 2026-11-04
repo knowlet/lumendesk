@@ -1,8 +1,10 @@
 """Launcher tests use fake processes, not a browser or WebKit acceptance result."""
 import importlib.util
+from contextlib import chdir
 import os
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -34,11 +36,14 @@ class RunnerTests(unittest.TestCase):
         self.write(self.wmctrl, '''import os, signal, sys
 from pathlib import Path
 p = Path(os.environ["FIXTURE_PID"])
-if sys.argv[1] == "-lp":
+if sys.argv[1:] == ["-lp"]:
     if p.exists():
         print("0x00000001 0 " + p.read_text() + " fakehost fixture")
-else:
+elif sys.argv[1:] == ["-ic", "0x00000001"]:
     os.kill(int(p.read_text()), signal.SIGUSR1)
+else:
+    print("unexpected wmctrl arguments", file=sys.stderr)
+    raise SystemExit(2)
 ''')
 
     def tearDown(self):
@@ -49,7 +54,7 @@ else:
         path.write_text("#!/usr/bin/env python3\n" + source)
         path.chmod(0o755)
 
-    def test_complete_handshake_and_normal_close(self):
+    def write_success_app(self):
         self.write(self.binary, '''import os, signal, time
 from pathlib import Path
 p = Path(os.environ["FIXTURE_PID"])
@@ -62,8 +67,47 @@ signal.signal(signal.SIGUSR1, close)
 print("LUMENDESK_WEB_READY_TO_CLOSE", flush=True)
 while True: time.sleep(0.02)
 ''')
+
+    def test_complete_handshake_and_normal_close(self):
+        self.write_success_app()
         runner.run(self.binary, 2, 1, self.log)
         self.assertIn(runner.PASS, self.log.read_text())
+
+    def test_shell_metacharacters_in_binary_path_are_literal(self):
+        self.binary = self.root / "app 'quoted'; touch SHELL_EXECUTED; # $(echo boom)"
+        self.write_success_app()
+        with chdir(self.root):
+            runner.run(self.binary, 2, 1, self.log)
+        self.assertIn(runner.PASS, self.log.read_text())
+        self.assertFalse((self.root / "SHELL_EXECUTED").exists())
+
+    def test_fake_wmctrl_rejects_wrong_close_option_or_id(self):
+        # No PID file exists: invalid argv must fail before attempting any signal.
+        for args in (["-c", "0x00000001"], ["-ic", "0x00000002"],
+                     ["-ic", "0x00000001", "extra"], ["-lp", "extra"], []):
+            with self.subTest(args=args):
+                result = subprocess.run([str(self.wmctrl), *args], shell=False,
+                                        capture_output=True, text=True, timeout=1)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("unexpected wmctrl arguments", result.stderr)
+
+    def test_malformed_or_option_like_window_ids_are_rejected(self):
+        for window in ("-1", "+1", "-0x1", "1", "0x", "0xGG", "0x100000000",
+                       "-ic", "0x1;touch", "$(touch)"):
+            with self.subTest(window=window):
+                result = subprocess.CompletedProcess([], 0, f"{window} 0 123 host title\n", "")
+                with patch.object(runner.subprocess, "run", return_value=result):
+                    with self.assertRaisesRegex(runner.AcceptanceError, "invalid window ID"):
+                        runner.windows_for_pid(str(self.wmctrl), 123)
+
+    def test_unrelated_pid_is_not_selected(self):
+        result = subprocess.CompletedProcess([], 0,
+            "0x00000002 0 456 host unrelated\n0x00000001 0 123 host owned\n", "")
+        with patch.object(runner.subprocess, "run", return_value=result) as execute:
+            self.assertEqual(runner.windows_for_pid(str(self.wmctrl), 123), ["0x00000001"])
+            self.assertEqual(runner.windows_for_pid(str(self.wmctrl), 789), [])
+            self.assertFalse(execute.call_args.kwargs["shell"])
+            self.assertEqual(execute.call_args.args[0], [str(self.wmctrl), "-lp"])
 
     def test_timeout_is_failure(self):
         self.write(self.binary, "import time\ntime.sleep(60)\n")

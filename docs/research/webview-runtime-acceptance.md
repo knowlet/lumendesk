@@ -68,6 +68,27 @@ progress stalled while GTK was idle. The exact locked
 [Tao 0.35.3 Linux event loop](https://github.com/tauri-apps/tao/blob/tao-v0.35.3/src/platform_impl/linux/event_loop.rs)
 checks `WaitUntil` before a blocking GTK iteration without arming a wake timer.
 IPC had only queued an mpsc command. The adapter now sends a coalesced proxy wake
-on accepted IPC and uses a stoppable 30ms Linux wake ticker for streams/events.
+on accepted IPC and uses a stoppable 30ms Linux wake ticker only while streams are live.
+Rust events wake the loop directly; idle applications park without periodic work.
 At most one wake is pending; teardown unparks and joins the ticker. This preserves
 the existing 30ms polling intent without a busy `ControlFlow::Poll` loop.
+
+
+## Review follow-up
+
+The initial fixed ticker preserved the prior 30ms polling intent but needlessly
+woke idle windows. It now parks with no active streams (except an explicitly
+requested timed smoke run); IPC and Rust events request their own coalesced wake.
+A display-free test observes no ticks before activation and deterministic thread
+shutdown. The engine fixture delivers its Rust event asynchronously after its
+RPC returns, without an active stream. This verifies the event wake path rather
+than depending on another RPC response.
+
+The runner subprocess audit has three boundaries: `wmctrl -lp` uses a trusted
+PATH executable with fixed argv; the acceptance binary is a caller-selected,
+trusted local executable, resolved as one literal argv item; `wmctrl -ic` uses
+only a PID-matched, validated unsigned 32-bit hexadecimal window ID. All calls
+use `shell=False`. Tests execute a filename with shell metacharacters literally,
+reject malformed/signed/option-like IDs, exclude unrelated PIDs, and require the
+fake WM to receive the exact close option and expected ID before signaling.
+These are command-construction checks, not a sandbox for untrusted executables.

@@ -4,11 +4,17 @@
 This does not create a display, alter WebKit sandbox policy, or emulate IPC.
 The application must report completion of its assertions before a normal
 window-manager close request is sent. A timeout never counts as acceptance.
+
+Trust boundary: --binary and wmctrl resolved from PATH are trusted executables,
+not sandboxed inputs. All three subprocess sites use argv lists with shell=False;
+paths are passed literally, not shell-escaped. Window IDs from wmctrl are validated
+as unsigned X11 hex IDs and selected only for the launched process PID.
 """
 from __future__ import annotations
 
 import argparse
 import os
+import re
 from pathlib import Path
 import selectors
 import shutil
@@ -50,7 +56,7 @@ def preflight(binary: Path) -> str:
 
 def windows_for_pid(wmctrl: str, pid: int) -> list[str]:
     result = subprocess.run(
-        [wmctrl, "-lp"], capture_output=True, text=True, timeout=1, check=False
+        [wmctrl, "-lp"], capture_output=True, text=True, timeout=1, check=False, shell=False
     )
     if result.returncode:
         raise AcceptanceError(f"wmctrl cannot enumerate windows: {result.stderr.strip()}")
@@ -59,10 +65,8 @@ def windows_for_pid(wmctrl: str, pid: int) -> list[str]:
         fields = line.split(None, 4)
         if len(fields) >= 4 and fields[2] == str(pid):
             window = fields[0]
-            try:
-                int(window, 16)
-            except ValueError as error:
-                raise AcceptanceError("wmctrl returned an invalid window ID") from error
+            if re.fullmatch(r"0x[0-9a-fA-F]{1,8}", window) is None:
+                raise AcceptanceError("wmctrl returned an invalid window ID")
             windows.append(window)
     return windows
 
@@ -91,7 +95,7 @@ def run(binary: Path, timeout: float, close_timeout: float, output: Path | None)
     log_size = 0
     process = subprocess.Popen(
         [str(binary.resolve())], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        start_new_session=True,
+        start_new_session=True, shell=False,
     )
     selector = selectors.DefaultSelector()
     buffers: dict[str, bytes] = {"stdout": b"", "stderr": b""}
@@ -143,7 +147,7 @@ def run(binary: Path, timeout: float, close_timeout: float, output: Path | None)
                 if windows:
                     result = subprocess.run(
                         [wmctrl, "-ic", windows[0]], capture_output=True, text=True,
-                        timeout=1, check=False,
+                        timeout=1, check=False, shell=False,
                     )
                     if result.returncode:
                         raise AcceptanceError(f"window-manager close failed: {result.stderr.strip()}")

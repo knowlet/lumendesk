@@ -26,6 +26,7 @@ impl WakeSignal {
 #[cfg(target_os = "linux")]
 pub(crate) struct WakeTicker {
     stopped: Arc<AtomicBool>,
+    active: Arc<AtomicBool>,
     worker: Option<std::thread::JoinHandle<()>>,
 }
 #[cfg(target_os = "linux")]
@@ -33,17 +34,44 @@ impl WakeTicker {
     pub fn new(interval: std::time::Duration, wake: impl Fn() -> bool + Send + 'static) -> Self {
         let stopped = Arc::new(AtomicBool::new(false));
         let stop = stopped.clone();
+        let active = Arc::new(AtomicBool::new(false));
+        let polling = active.clone();
         let worker = std::thread::spawn(move || {
             loop {
-                std::thread::park_timeout(interval);
-                if stop.load(Ordering::Acquire) || !wake() {
+                if polling.load(Ordering::Acquire) {
+                    std::thread::park_timeout(interval);
+                } else {
+                    std::thread::park();
+                }
+                if stop.load(Ordering::Acquire) || (polling.load(Ordering::Acquire) && !wake()) {
                     break;
                 }
             }
         });
         Self {
             stopped,
+            active,
             worker: Some(worker),
+        }
+    }
+    pub fn activity(&self) -> WakeActivity {
+        WakeActivity {
+            active: self.active.clone(),
+            worker: self.worker.as_ref().unwrap().thread().clone(),
+        }
+    }
+}
+#[cfg(target_os = "linux")]
+#[derive(Clone)]
+pub(crate) struct WakeActivity {
+    active: Arc<AtomicBool>,
+    worker: std::thread::Thread,
+}
+#[cfg(target_os = "linux")]
+impl WakeActivity {
+    pub fn set_active(&self, active: bool) {
+        if self.active.swap(active, Ordering::AcqRel) != active {
+            self.worker.unpark();
         }
     }
 }
@@ -82,10 +110,16 @@ mod tests {
     }
     #[cfg(target_os = "linux")]
     #[test]
-    fn idle_ticker_wakes_and_drop_stops_and_joins_it() {
+    fn idle_ticker_parks_until_demand_and_drop_stops_and_joins_it() {
         use std::{sync::mpsc, time::Duration};
         let (tx, rx) = mpsc::channel();
         let ticker = WakeTicker::new(Duration::from_millis(5), move || tx.send(()).is_ok());
+        assert_eq!(
+            rx.recv_timeout(Duration::from_millis(50)),
+            Err(mpsc::RecvTimeoutError::Timeout)
+        );
+        ticker.activity().set_active(true);
+        rx.recv_timeout(Duration::from_secs(2)).unwrap();
         rx.recv_timeout(Duration::from_secs(2)).unwrap();
         drop(ticker);
         // Joining drops the sender; drain any tick that preceded shutdown.
