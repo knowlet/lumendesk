@@ -1,5 +1,9 @@
 # Verification summary
 
+Historical local evidence from October 2026, retained unchanged below. For later
+scoped hosted Linux WebKitGTK results, see [acceptance](../ACCEPTANCE.md).
+These local restrictions are not the current hosted-CI status.
+
 2026-10-13 UTC, Debian 13 x86_64, Rust/Cargo 1.99.0, Node 24.19.0,
 TypeScript 7.0.2. GUI library versions and sandbox details: GUI_ENVIRONMENT.md.
 

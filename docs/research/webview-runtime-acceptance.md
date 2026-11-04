@@ -80,9 +80,11 @@ The initial fixed ticker preserved the prior 30ms polling intent but needlessly
 woke idle windows. It now parks with no active streams (except an explicitly
 requested timed smoke run); IPC and Rust events request their own coalesced wake.
 A display-free test observes no ticks before activation and deterministic thread
-shutdown. The engine fixture delivers its Rust event asynchronously after its
-RPC returns, without an active stream. This verifies the event wake path rather
-than depending on another RPC response.
+shutdown. The engine fixture delays its Rust event on a background thread,
+without an active stream. This proves asynchronous delivery and payload fidelity,
+not that the UI processed the RPC response and entered idle before the event.
+Deterministic isolated idle-event wake acceptance remains future work; the helper
+tests separately verify parking, reactivation, and wake coalescing.
 
 The runner subprocess audit has three boundaries: `wmctrl -lp` uses a trusted
 PATH executable with fixed argv; the acceptance binary is a caller-selected,

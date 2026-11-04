@@ -184,7 +184,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         move |ctx, value| {
             let events = events.clone();
             std::thread::spawn(move || {
-                // Deliver after the RPC returns, while no stream ticker is active.
+                // Delay delivery without starting a stream. This sleep does not prove
+                // the UI has processed the RPC response or entered its idle wait.
                 std::thread::sleep(Duration::from_millis(100));
                 if let Err(error) = events.emit(Some(ctx.window), "probe", value) {
                     eprintln!("acceptance event delivery failed: {error}");
