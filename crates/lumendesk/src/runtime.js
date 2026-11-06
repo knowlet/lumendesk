@@ -254,6 +254,8 @@
     if(closed || session!==token) return;
     const set=listeners.get(name); if(!set)return;
     for(const entry of Array.from(set)) {
+      // Earlier or recursive callbacks may have removed this snapshot entry.
+      if(!set.has(entry))continue;
       if(entry.once)set.delete(entry);
       try { entry.callback(value); } catch(error) { console.error(error); }
     }
