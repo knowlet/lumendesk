@@ -254,6 +254,7 @@
     if(closed || session!==token) return;
     const set=listeners.get(name); if(!set)return;
     for(const entry of Array.from(set)) {
+      if(closed)break;
       if(entry.once)set.delete(entry);
       try { entry.callback(value); } catch(error) { console.error(error); }
     }
