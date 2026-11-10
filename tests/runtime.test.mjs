@@ -411,6 +411,110 @@ test('transport failure removes the attached abort listener', async () => {
   assert.equal(r.timers.size, 0);
 });
 
+function throwingCleanupSignal({ getter = false } = {}) {
+  const callbacks = new Set();
+  const signal = {
+    aborted: false,
+    addEventListener(_name, callback) { callbacks.add(callback); },
+    removeEventListener() { throw new Error('instrumented removal failed'); },
+  };
+  return {
+    signal,
+    failGetter() {
+      if (getter) Object.defineProperty(signal, 'removeEventListener', {
+        get() { throw new Error('instrumented removal getter failed'); },
+      });
+    },
+    abort() {
+      signal.aborted = true;
+      for (const callback of callbacks) callback();
+    },
+  };
+}
+
+for (const getter of [false, true]) {
+  for (const [label, response, expected] of [
+    ['success', { Ok: 'done' }, null],
+    ['backend failure', { Err: { code: 'backend', message: 'failed' } }, /failed/],
+    ['malformed reply', null, /Malformed backend response/],
+  ]) {
+    test(`throwing call cleanup cannot strand ${label} (getter=${getter})`, async () => {
+      const r = makeRuntime();
+      const fixture = throwingCleanupSignal({ getter });
+      const promise = r.window.lumen.call('echo', null, fixture.signal);
+      const settled = expected ? assert.rejects(promise, expected) : promise;
+      fixture.failGetter();
+      assert.doesNotThrow(() => r.respond(1, response));
+      assert.equal(await settled, expected ? undefined : 'done');
+      assert.equal(r.timers.size, 0);
+      // A listener that could not be removed must be harmless after settlement.
+      assert.doesNotThrow(() => fixture.abort());
+      r.respond(1, { Ok: 'late' });
+      assert.equal(r.outbound.length, 1);
+      const replacement = r.window.lumen.call('echo', null);
+      r.respond(2, { Ok: 'capacity reusable' });
+      assert.equal(await replacement, 'capacity reusable');
+    });
+  }
+}
+
+for (const timeout of [false, true]) {
+  test(`throwing call cleanup preserves ${timeout ? 'timeout' : 'abort'} cancellation`, async () => {
+    const r = makeRuntime();
+    const fixture = throwingCleanupSignal();
+    const promise = r.window.lumen.call('slow', null, { signal: fixture.signal, timeoutMs: 9 });
+    const rejection = assert.rejects(promise, timeout ? /Call timed out/ :
+      error => error.name === 'AbortError' && error.code === 'cancelled');
+    assert.doesNotThrow(() => timeout ? r.fireTimer() : fixture.abort());
+    await rejection;
+    assert.equal(r.timers.size, 0);
+    assert.deepEqual(r.outbound[1], { session: SESSION, cancel: 1 });
+    fixture.abort();
+    r.respond(1, { Ok: 'late' });
+    assert.equal(r.outbound.length, 2);
+  });
+}
+
+test('throwing call cleanup cannot interrupt pagehide teardown', async () => {
+  const r = makeRuntime();
+  const fixture = throwingCleanupSignal();
+  const first = r.window.lumen.call('echo', null, fixture.signal);
+  const second = r.window.lumen.call('echo', null);
+  const stream = r.window.lumen.stream('items', null);
+  const read = stream.next();
+  const rejections = [first, second, stream.result, read].map(promise =>
+    assert.rejects(promise, /Page session ended/));
+  let deliveries = 0;
+  r.window.lumen.on('event', () => deliveries++);
+  assert.doesNotThrow(() => r.pagehide());
+  await Promise.all(rejections);
+  assert.equal(r.timers.size, 0);
+  assert.equal(r.outbound.filter(message => message.cancel !== undefined).length, 1);
+  fixture.abort();
+  r.emit('event', null);
+  assert.equal(deliveries, 0);
+  await assert.rejects(r.window.lumen.call('echo', null), /Page session ended/);
+});
+
+test('throwing call cleanup preserves transport errors and releases capacity', async () => {
+  const r = makeRuntime({ throwTransport: true });
+  const fixture = throwingCleanupSignal();
+  for (let index = 0; index < 40; index++) {
+    await assert.rejects(r.window.lumen.call('echo', null, fixture.signal), /mock transport unavailable/);
+  }
+  assert.equal(r.timers.size, 0);
+  assert.deepEqual(r.outbound, []);
+});
+
+test('throwing call cleanup preserves listener-registration errors', async () => {
+  const r = makeRuntime();
+  const fixture = throwingCleanupSignal();
+  fixture.signal.addEventListener = () => { throw new Error('registration failed'); };
+  await assert.rejects(r.window.lumen.call('echo', null, fixture.signal), /registration failed/);
+  assert.equal(r.timers.size, 0);
+  assert.deepEqual(r.outbound, []);
+});
+
 test('abort during argument serialization prevents sending the request', async () => {
   const r = makeRuntime();
   const { controller, signal, listeners } = trackedAbortController();
