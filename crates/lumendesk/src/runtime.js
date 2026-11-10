@@ -41,7 +41,12 @@
     // submit nested work. Finish all of them before selecting the next ID.
     const fields=JSON.stringify({method,args});
     let timer;
-    const cleanup=()=>{clearTimeout(timer);if(signal)signal.removeEventListener('abort',onAbort);};
+    const cleanup=()=>{
+      clearTimeout(timer);
+      if(signal) {
+        try { signal.removeEventListener('abort',onAbort); } catch (_) {}
+      }
+    };
     const cancel=error=>{
       if(!pending.delete(id))return;
       cleanup();
