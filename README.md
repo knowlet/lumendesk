@@ -5,8 +5,11 @@ controls, system-webview windows, a typed JSON bridge, and project tooling.
 
 **This is a working first milestone with incomplete desktop acceptance.** CI at
 PR #1 commit `a90f4c2` passed Linux, macOS and Windows builds, linking and
-display-free contracts. Actual window rendering, OS input, Wry IPC and WebView
-security boundaries have not been verified. Simultaneous native and webview
+display-free contracts. PR #4 also verifies Linux WebKitGTK under Xvfb/Openbox:
+real IPC, events, ordered/bounded streams, cancellation, navigation, CSP frame
+denial and normal window close. See [real-engine evidence](docs/research/webview-runtime-acceptance.md).
+Other OS GUI runtimes, OS input, IME, accessibility, GPU performance and exhaustive
+hostile-frame security coverage remain unverified. Simultaneous native and webview
 windows in one process are not implemented yet. See the dated evidence in
 [platform notes](docs/PLATFORMS.md) and the current commit's Actions results.
 
@@ -60,8 +63,9 @@ The reference forms share the same `FormState` definition, but run as separate
 applications. The JavaScript runtime offers promise calls, on/once/unsubscribe listeners, and
 pull-driven typed async-iterator streams. Stream queues are bounded and cancellable;
 terminal results follow the final consumed item. See [streaming](docs/STREAMING.md).
-The Rust/JavaScript wire fixture is shared by both test suites; actual OS-webview
-stream execution remains unverified.
+The Rust/JavaScript wire fixture is shared by both test suites. Linux WebKitGTK
+stream execution is verified by the real-engine CI fixture; macOS/Windows stream
+runtime acceptance remains unverified.
 
 ## Portable archives
 
