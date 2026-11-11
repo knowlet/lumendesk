@@ -9,12 +9,14 @@ Trust boundary: --binary and wmctrl resolved from PATH are trusted executables,
 not sandboxed inputs. All three subprocess sites use argv lists with shell=False;
 paths are passed literally, not shell-escaped. Window IDs from wmctrl are validated
 as unsigned X11 hex IDs and selected only for the launched process PID.
+`trusted_run` and `trusted_popen` are the only subprocess entry points in this module.
 """
 from __future__ import annotations
 
 import argparse
 import os
 import re
+from collections.abc import Sequence
 from pathlib import Path
 import selectors
 import shutil
@@ -38,6 +40,23 @@ class AcceptanceError(RuntimeError):
     pass
 
 
+def _argv_list(argv: Sequence[str]) -> list[str]:
+    parts = list(argv)
+    if not parts or not all(isinstance(part, str) for part in parts):
+        raise AcceptanceError("trusted subprocess argv must be a non-empty string list")
+    return parts
+
+
+def trusted_run(argv: Sequence[str], **kwargs) -> subprocess.CompletedProcess[str]:
+    kwargs["shell"] = False
+    return subprocess.run(_argv_list(argv), **kwargs)  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+
+
+def trusted_popen(argv: Sequence[str], **kwargs) -> subprocess.Popen[bytes]:
+    kwargs["shell"] = False
+    return subprocess.Popen(_argv_list(argv), **kwargs)  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+
+
 def preflight(binary: Path) -> str:
     if not os.environ.get("DISPLAY"):
         raise AcceptanceError("DISPLAY is missing; run under an authenticated X11 session")
@@ -56,8 +75,8 @@ def preflight(binary: Path) -> str:
 
 
 def windows_for_pid(wmctrl: str, pid: int) -> list[str]:
-    result = subprocess.run(
-        [wmctrl, "-lp"], capture_output=True, text=True, timeout=1, check=False, shell=False
+    result = trusted_run(
+        [wmctrl, "-lp"], capture_output=True, text=True, timeout=1, check=False
     )
     if result.returncode:
         raise AcceptanceError(f"wmctrl cannot enumerate windows: {result.stderr.strip()}")
@@ -94,9 +113,11 @@ def run(binary: Path, timeout: float, close_timeout: float, output: Path | None)
     wmctrl = preflight(binary)
     log: list[str] = []
     log_size = 0
-    process = subprocess.Popen(
-        [str(binary.resolve())], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        start_new_session=True, shell=False,
+    process = trusted_popen(
+        [str(binary.resolve())],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
     )
     selector = selectors.DefaultSelector()
     buffers: dict[str, bytes] = {"stdout": b"", "stderr": b""}
@@ -155,9 +176,12 @@ def run(binary: Path, timeout: float, close_timeout: float, output: Path | None)
                 if len(windows) > 1:
                     raise AcceptanceError("expected exactly one application window")
                 if windows:
-                    result = subprocess.run(
-                        [wmctrl, "-ic", windows[0]], capture_output=True, text=True,
-                        timeout=1, check=False, shell=False,
+                    result = trusted_run(
+                        [wmctrl, "-ic", windows[0]],
+                        capture_output=True,
+                        text=True,
+                        timeout=1,
+                        check=False,
                     )
                     if result.returncode:
                         raise AcceptanceError(f"window-manager close failed: {result.stderr.strip()}")

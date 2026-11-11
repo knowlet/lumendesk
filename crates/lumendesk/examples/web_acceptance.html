@@ -43,6 +43,7 @@ window.addEventListener('lumendesk-ready', async () => {
       const unsubscribe = lumen.on('probe', value => { received = value; }, {once: true});
       try {
         await lumen.call('emit-probe', payload);
+        await lumen.call('deliver-probe', null);
         await until(() => received !== undefined, 'backend event was not injected');
         assert(received === payload, 'event serialization changed its payload');
       } finally { unsubscribe(); }

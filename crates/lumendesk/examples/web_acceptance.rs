@@ -1,7 +1,7 @@
 //! Bounded real-engine acceptance fixture; not a production application API.
 use lumendesk::{
     WindowOptions,
-    core::{Bridge, BridgeConfig, CoreError, MethodSchema, Schema, StreamMethodSchema},
+    core::{Bridge, BridgeConfig, CoreError, MethodSchema, Schema, StreamMethodSchema, WindowId},
     webview::{APP_ORIGIN, WebApplication, demo_assets},
 };
 use serde::{Deserialize, Serialize};
@@ -179,18 +179,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = WebApplication::new(bridge.clone());
     app.register_event("probe", Schema::String)?;
     let events = app.events();
+    let probe_pending: Arc<Mutex<Option<(WindowId, String)>>> = Arc::new(Mutex::new(None));
+    let pending_store = probe_pending.clone();
     bridge.register::<String, bool, _>(
         MethodSchema::new("emit-probe", Schema::String, Schema::Boolean),
         move |ctx, value| {
-            let events = events.clone();
-            std::thread::spawn(move || {
-                // Delay delivery without starting a stream. This sleep does not prove
-                // the UI has processed the RPC response or entered its idle wait.
-                std::thread::sleep(Duration::from_millis(100));
-                if let Err(error) = events.emit(Some(ctx.window), "probe", value) {
-                    eprintln!("acceptance event delivery failed: {error}");
-                }
-            });
+            *pending_store.lock().unwrap() = Some((ctx.window, value));
+            Ok(true)
+        },
+    )?;
+    let pending_deliver = probe_pending;
+    bridge.register::<Value, bool, _>(
+        MethodSchema::new("deliver-probe", Schema::Null, Schema::Boolean),
+        move |_, _| {
+            let (window, value) = pending_deliver
+                .lock()
+                .unwrap()
+                .take()
+                .ok_or_else(|| CoreError::Backend("probe payload was not staged".into()))?;
+            events
+                .emit(Some(window), "probe", value)
+                .map_err(|error| CoreError::Backend(error.to_string()))?;
             Ok(true)
         },
     )?;

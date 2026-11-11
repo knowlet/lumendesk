@@ -1,4 +1,5 @@
 """Launcher tests use fake processes, not a browser or WebKit acceptance result."""
+import ast
 import importlib.util
 from contextlib import chdir
 import os
@@ -224,6 +225,32 @@ while True: time.sleep(0.02)
         os.environ.pop("DISPLAY")
         with self.assertRaisesRegex(runner.AcceptanceError, "DISPLAY"):
             runner.preflight(self.binary)
+
+    def test_runner_subprocess_helpers_never_enable_shell(self):
+        tree = ast.parse(Path(runner.__file__).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if not (
+                isinstance(func, ast.Attribute)
+                and func.attr in {"run", "Popen"}
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "subprocess"
+            ):
+                continue
+            for keyword in node.keywords:
+                if keyword.arg == "shell":
+                    self.fail("direct subprocess call must not set shell= in the runner module")
+        trusted_modules = {"trusted_run", "trusted_popen"}
+        seen = {
+            node.func.id
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in trusted_modules
+        }
+        self.assertEqual(seen, trusted_modules)
 
 
 if __name__ == "__main__":
