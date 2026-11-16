@@ -78,15 +78,20 @@ be cloned into stream completion slots.
 Host-generated callbacks carry the target session into the JavaScript closure,
 which rechecks it at execution time. JSON payloads are parsed from escaped
 strings, preserving keys such as `__proto__` as data. Shared Rust/Node fixtures
-exercise delayed-delivery and data-integrity contracts; actual engine navigation
-and iframe behavior remain unverified.
+exercise delayed-delivery and data-integrity contracts. The scoped Linux
+WebKitGTK fixture additionally exercises frame CSP denial, untrusted navigation
+rejection and same-origin navigation cleanup. This does not establish complete
+iframe isolation or macOS/Windows engine behavior. See the dated evidence in
+[acceptance](ACCEPTANCE.md) and verify the current head-associated CI separately.
 
 The runtime defaults to a 30-second idle/read timeout. The host enforces a
 60-second idle/read ceiling and sends an explicit terminal error on expiry, even
 if a larger frontend timeout was requested. Awaiting a stream's `.result` without
 draining the iterator deliberately backpressures and eventually times out.
-Actual Wry stream execution is not verified; mock JavaScript and Rust host tests
-share exact wire fixtures. Legacy call-bound Rust streams remain available too.
+Linux WebKitGTK stream execution has prior-candidate real-engine evidence for
+ordering, bounded backpressure and cancellation/restart; macOS/Windows runtime
+acceptance remains pending. Mock JavaScript and Rust host tests share exact wire
+fixtures. Legacy call-bound Rust streams remain available too.
 
 Embedded assets are served from an in-memory allowlist, never from the filesystem.
 Traversal (including repeated percent encoding), NULs and backslashes are rejected.

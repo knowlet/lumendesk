@@ -5,6 +5,7 @@ use crate::core::{
     CoreError, Field, MethodSchema, Schema, SessionToken, TrustedOrigin, WindowId,
 };
 use crate::web_streams::{MAX_STREAMS, StreamBook, WorkBudget, WorkPermit};
+use crate::web_wake::WakeSignal;
 use crate::{DesktopError, FormState, WindowOptions};
 use serde::Deserialize;
 use serde_json::Value;
@@ -43,6 +44,7 @@ struct HostEvent {
 }
 #[derive(Default)]
 struct EventState {
+    wake: Option<Box<dyn Fn() + Send>>,
     queues: BTreeMap<WindowId, VecDeque<HostEvent>>,
     schemas: BTreeMap<String, Schema>,
 }
@@ -91,6 +93,9 @@ impl EventSender {
                 name: name.clone(),
                 payload: payload.clone(),
             });
+        }
+        if let Some(wake) = &state.wake {
+            wake();
         }
         Ok(())
     }
@@ -173,6 +178,7 @@ impl WebApplication {
     }
 }
 enum UiMessage {
+    Wake,
     Started(WindowId),
     Ready(WindowId, String),
     Response(WindowId, SessionToken, CallResponse),
@@ -229,6 +235,8 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
     }
     let mut event_loop = EventLoopBuilder::<UiMessage>::with_user_event().build();
     let mut open = BTreeMap::new();
+    let wake_signal = WakeSignal::default();
+    let event_state = app.sender.state.clone();
     let call_budget = WorkBudget::default();
     let stream_budget = WorkBudget::default();
     let mut streams = StreamBook::default();
@@ -293,6 +301,8 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
         });
         let ipc_bridge = app.bridge.clone();
         let page_proxy = event_loop.create_proxy();
+        let command_proxy = event_loop.create_proxy();
+        let command_wake = wake_signal.clone();
         let builder = WebViewBuilder::new()
             .with_url(APP_URL)
             .with_devtools(false)
@@ -369,13 +379,20 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
                     // The trusted runtime has a smaller pending limit. Raw IPC flooding
                     // is dropped instead of allocating unbounded event-loop messages.
                     eprintln!("lumendesk: incoming IPC queue full; request will time out");
+                } else {
+                    command_wake.request(|| command_proxy.send_event(UiMessage::Wake).is_ok());
                 }
             });
         #[cfg(target_os = "linux")]
         let view = {
             use tao::platform::unix::WindowExtUnix;
             use wry::WebViewBuilderExtUnix;
-            builder.build_gtk(window.gtk_window()).map_err(backend)?
+            // Tao's GtkApplicationWindow already contains its default GtkBox.
+            // GtkBin accepts one child, so attach the view to that existing box.
+            let container = window.default_vbox().ok_or_else(|| {
+                DesktopError::Backend("Tao window is missing its default GTK container".into())
+            })?;
+            builder.build_gtk(container).map_err(backend)?
         };
         #[cfg(not(target_os = "linux"))]
         let view = builder.build(&window).map_err(backend)?;
@@ -391,15 +408,32 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
             },
         );
     }
+    let event_proxy = event_loop.create_proxy();
+    let event_wake = wake_signal.clone();
+    event_state.lock().unwrap().wake = Some(Box::new(move || {
+        event_wake.request(|| event_proxy.send_event(UiMessage::Wake).is_ok());
+    }));
     let started = Instant::now();
     let smoke = std::env::var("LUMENDESK_SMOKE_MS")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
         .map(Duration::from_millis);
     let cancel_first = std::env::var_os("LUMENDESK_CANCEL_FIRST_CLOSE").is_some();
+    // Tao's Linux WaitUntil does not arm a GTK timeout. An actual wake source
+    // is needed while streams are live; idle apps park until IPC/events arrive.
+    #[cfg(target_os = "linux")]
+    let ticker = {
+        let proxy = event_loop.create_proxy();
+        let signal = wake_signal.clone();
+        crate::web_wake::WakeTicker::new(Duration::from_millis(30), move || {
+            signal.request(|| proxy.send_event(UiMessage::Wake).is_ok())
+        })
+    };
+    #[cfg(target_os = "linux")]
+    let activity = ticker.activity();
     event_loop.run_return(move |event, _, flow| {
-        *flow = ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(30));
         match event {
+            Event::UserEvent(UiMessage::Wake) => wake_signal.acknowledge(),
             Event::WindowEvent { window_id, event: WindowEvent::CloseRequested, .. } => {
                 let id = open.iter().find(|(_, window)| window.window.id() == window_id).map(|(id, _)| *id);
                 if let Some(id) = id {
@@ -478,10 +512,18 @@ fn run_application(mut app: WebApplication) -> Result<(), DesktopError> {
             }
             _ => {}
         }
-        if open.is_empty() {
-            *flow = ControlFlow::Exit;
-        }
+        let polling = !streams.is_empty() || smoke.is_some();
+        #[cfg(target_os = "linux")]
+        activity.set_active(polling);
+        *flow = if open.is_empty() {
+            ControlFlow::Exit
+        } else if polling {
+            ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(30))
+        } else {
+            ControlFlow::Wait
+        };
     });
+    event_state.lock().unwrap().wake = None;
     Ok(())
 }
 // Bind at JavaScript execution time as well as host enqueue time. Engine script

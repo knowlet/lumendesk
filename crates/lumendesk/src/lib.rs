@@ -7,6 +7,8 @@ pub mod native;
 #[cfg(feature = "webview")]
 mod web_streams;
 #[cfg(feature = "webview")]
+mod web_wake;
+#[cfg(feature = "webview")]
 pub mod webview;
 
 /// Shared, device-independent window settings.
