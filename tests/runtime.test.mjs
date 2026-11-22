@@ -521,6 +521,63 @@ test('pagehide clears previously registered event listeners', () => {
   assert.equal(count, 0);
 });
 
+test('pagehide during event dispatch stops remaining regular and once callbacks', () => {
+  const r = makeRuntime();
+  const received = [];
+  r.window.lumen.on('greeting', () => {
+    received.push('first');
+    r.pagehide();
+    received.push('first finished');
+  });
+  r.window.lumen.on('greeting', () => received.push('regular'));
+  r.window.lumen.on('greeting', () => received.push('once'), { once: true });
+  r.emit('greeting', null);
+  r.emit('greeting', 'late');
+  r.pagehide();
+  assert.deepEqual(received, ['first', 'first finished']);
+  assert.deepEqual(r.errors, []);
+});
+
+test('pagehide in recursive event delivery stops the nested and outer snapshots', () => {
+  const r = makeRuntime();
+  const received = [];
+  r.window.lumen.on('greeting', value => {
+    received.push(`first:${value}`);
+    if (value === 'outer') r.emit('greeting', 'nested');
+    else r.pagehide();
+    received.push(`finished:${value}`);
+  });
+  r.window.lumen.on('greeting', value => received.push(`second:${value}`));
+  r.emit('greeting', 'outer');
+  assert.deepEqual(received, ['first:outer', 'first:nested', 'finished:nested', 'finished:outer']);
+});
+
+test('pagehide in another event stops both active event deliveries', () => {
+  const r = makeRuntime();
+  const received = [];
+  r.window.lumen.on('outer', () => { received.push('outer'); r.emit('inner', null); });
+  r.window.lumen.on('outer', () => received.push('late outer'));
+  r.window.lumen.on('inner', () => { received.push('inner'); r.pagehide(); }, { once: true });
+  r.window.lumen.on('inner', () => received.push('late inner'));
+  r.emit('outer', null);
+  assert.deepEqual(received, ['outer', 'inner']);
+});
+
+test('an error after pagehide cannot resume delivery to an ended page session', () => {
+  const r = makeRuntime();
+  const received = [];
+  r.window.lumen.on('greeting', () => {
+    received.push('first');
+    r.pagehide();
+    throw new Error('listener failed after pagehide');
+  });
+  r.window.lumen.on('greeting', () => received.push('late'));
+  r.emit('greeting', null);
+  assert.deepEqual(received, ['first']);
+  assert.equal(r.errors.length, 1);
+  assert.match(r.errors[0].message, /listener failed after pagehide/);
+});
+
 // Streaming cases below use the same mock VM. They do not exercise a webview,
 // native host scheduling, or a graphical desktop.
 const normalized = value => JSON.parse(JSON.stringify(value));
