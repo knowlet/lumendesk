@@ -55,6 +55,64 @@ preparsed request and enforces the serialized request size too. Default limits
 are 1 MiB per request/result and 64 pending calls/cancellation tombstones per
 session. Backend worker queues need their own bound.
 
+### Scheduling ordinary calls
+
+Use `begin_call` to admit requests in authenticated receive order before moving
+the returned `CallJob` to a bounded worker pool. `begin_call_json` additionally
+bounds raw bytes before parsing. Admission does not execute application code;
+argument/result schemas are checked when the job runs. Calls and frontend
+streams share the same request-ID namespace and per-session budget.
+
+This display-free example admits two jobs in order and executes them in reverse.
+It illustrates the scheduling boundary, not a built-in executor or UI transport:
+
+```rust
+use lumendesk_core::{Authorization, Bridge, BridgeConfig, CallRequest,
+    MethodSchema, Schema, WindowId};
+use serde_json::json;
+
+let bridge = Bridge::new(BridgeConfig::production("lumendesk://app")?)?;
+bridge.register::<u32, u32, _>(
+    MethodSchema::new("echo", Schema::Integer, Schema::Integer),
+    |_, value| Ok(value),
+)?;
+let window = WindowId(1);
+let auth = Authorization {
+    window,
+    session: bridge.create_session(window, "lumendesk://app/index.html")?,
+    page_url: "lumendesk://app/index.html".into(),
+    top_level: true,
+};
+let first = bridge.begin_call(&auth, CallRequest {
+    id: 1, method: "echo".into(), args: json!(10),
+})?;
+let second = bridge.begin_call(&auth, CallRequest {
+    id: 2, method: "echo".into(), args: json!(20),
+})?;
+for (job, expected) in [(second, 20), (first, 10)] {
+    let destination = job.authorization().clone();
+    let response = job.run();
+    // A real host performs this check immediately before UI delivery.
+    bridge.authorize(&destination)?;
+    assert_eq!(response.result?, json!(expected));
+}
+# Ok::<(), lumendesk_core::CoreError>(())
+```
+
+`CallJob::run(self)` executes once. Dropping an unrun job cancels it and releases
+its reservation without executing the handler; its ID remains consumed. Drop
+does not send a response, so a host rejecting an admitted job must deliver its
+own bounded error after checking the original authorization. Cancelling running
+work retains its reservation until the handler exits. Session replacement and
+navigation cancel old jobs; old cleanup cannot remove a new session's same-ID
+reservation. Debug output excludes the session token.
+
+Parallel execution does not guarantee side-effect order. Keep stateful handlers
+serialized where needed, and enforce process-wide worker/queue limits across
+windows and session replacement. The existing Wry adapter remains serialized;
+this API does not migrate an adapter or authenticate a WebView frame. See the
+[call-admission contract](../../docs/CALL_ADMISSION.md) for scope and checks.
+
 ## Streams
 
 `CallContext::stream<T>(capacity)` creates a bounded ordered stream tied to the
