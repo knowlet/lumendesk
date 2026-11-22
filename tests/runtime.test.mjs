@@ -483,6 +483,42 @@ test('once listeners are removed before their callback, including recursive emis
   assert.equal(regular, 3);
 });
 
+test('recursive event delivery cannot invoke a later once listener twice', () => {
+  const r = makeRuntime();
+  const delivered = [];
+  r.window.lumen.on('greeting', value => {
+    delivered.push(`first:${value}`);
+    r.emit('greeting', 'nested');
+  }, { once: true });
+  r.window.lumen.on('greeting', value => delivered.push(`second:${value}`), { once: true });
+  r.emit('greeting', 'outer');
+  r.emit('greeting', 'later');
+  assert.deepEqual(delivered, ['first:outer', 'second:nested']);
+});
+
+test('an event callback can unsubscribe a later listener before its turn', () => {
+  const r = makeRuntime();
+  const delivered = [];
+  r.window.lumen.on('greeting', () => { delivered.push('first'); unsubscribe(); });
+  const unsubscribe = r.window.lumen.on('greeting', () => delivered.push('removed'));
+  r.window.lumen.on('greeting', () => delivered.push('last'));
+  r.emit('greeting', null);
+  assert.deepEqual(delivered, ['first', 'last']);
+});
+
+test('listeners added during delivery wait for the next event', () => {
+  const r = makeRuntime();
+  const delivered = [];
+  r.window.lumen.on('greeting', () => {
+    delivered.push('first');
+    r.window.lumen.on('greeting', () => delivered.push('added'));
+  }, { once: true });
+  r.emit('greeting', null);
+  assert.deepEqual(delivered, ['first']);
+  r.emit('greeting', null);
+  assert.deepEqual(delivered, ['first', 'added']);
+});
+
 test('unsubscribe is idempotent and prevents all later event deliveries', () => {
   const r = makeRuntime();
   let count = 0;
