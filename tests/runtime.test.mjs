@@ -1406,3 +1406,23 @@ for (const outerKind of ['call', 'stream']) {
     });
   }
 }
+
+for (const phase of ['transport', 'pagehide']) {
+  test(`reentrant abort cleanup preserves the original ${phase} error`, async () => {
+    const r = makeRuntime({ throwTransport: phase === 'transport' });
+    const controller = new AbortController();
+    const { signal } = controller;
+    const remove = signal.removeEventListener.bind(signal);
+    signal.removeEventListener = (...args) => {
+      controller.abort();
+      remove(...args);
+    };
+    const promise = r.window.lumen.call('echo', null, { signal });
+    const error = phase === 'transport' ? /mock transport unavailable/ : /Page session ended/;
+    const rejection = assert.rejects(promise, error);
+    if (phase === 'pagehide') r.pagehide();
+    await rejection;
+    assert.equal(r.timers.size, 0);
+    assert.ok(!r.outbound.some(message => Object.hasOwn(message, 'cancel')));
+  });
+}

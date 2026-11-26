@@ -16,11 +16,12 @@
     `{"session":${sessionJson},"${kind}":{"id":${id},${fields.slice(1)}}`;
   const rejectAll = () => {
     closed = true;
-    for (const entry of pending.values()) {
+    const calls = Array.from(pending.values());
+    pending.clear();
+    for (const entry of calls) {
       entry.cleanup();
       entry.reject(new Error('Page session ended'));
     }
-    pending.clear();
     for (const entry of Array.from(streams.values())) entry.cancel(new Error('Page session ended'));
     listeners.clear();
   };
@@ -63,7 +64,7 @@
       id=nextId++;
       pending.set(id, {resolve,reject,cleanup});
       transport(requestMessage('request',id,fields));
-    } catch (error) { cleanup(); pending.delete(id); reject(error); }
+    } catch (error) { pending.delete(id); cleanup(); reject(error); }
   });
   const stream = (method, args, options = {}) => {
     let id, timer, signal, timeout, waiting;
