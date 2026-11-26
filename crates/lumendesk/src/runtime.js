@@ -16,11 +16,12 @@
     `{"session":${sessionJson},"${kind}":{"id":${id},${fields.slice(1)}}`;
   const rejectAll = () => {
     closed = true;
-    for (const entry of pending.values()) {
+    const calls = Array.from(pending.values());
+    pending.clear();
+    for (const entry of calls) {
       entry.cleanup();
       entry.reject(new Error('Page session ended'));
     }
-    pending.clear();
     for (const entry of Array.from(streams.values())) entry.cancel(new Error('Page session ended'));
     listeners.clear();
   };
@@ -41,7 +42,12 @@
     // submit nested work. Finish all of them before selecting the next ID.
     const fields=JSON.stringify({method,args});
     let timer;
-    const cleanup=()=>{clearTimeout(timer);if(signal)signal.removeEventListener('abort',onAbort);};
+    const cleanup=()=>{
+      clearTimeout(timer);
+      if(signal) {
+        try { signal.removeEventListener('abort',onAbort); } catch (_) {}
+      }
+    };
     const cancel=error=>{
       if(!pending.delete(id))return;
       cleanup();
@@ -58,7 +64,7 @@
       id=nextId++;
       pending.set(id, {resolve,reject,cleanup});
       transport(requestMessage('request',id,fields));
-    } catch (error) { cleanup(); pending.delete(id); reject(error); }
+    } catch (error) { pending.delete(id); cleanup(); reject(error); }
   });
   const stream = (method, args, options = {}) => {
     let id, timer, signal, timeout, waiting;
